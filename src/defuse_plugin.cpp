@@ -13,7 +13,7 @@ namespace llvm {
 
     PreservedAnalyses DefUsePluginPass::run(Module& M, ModuleAnalysisManager &AM) {
         std::error_code EC;
-        raw_fd_ostream DotFile("graph.dot", EC, sys::fs::OF_Text);
+        raw_fd_ostream DotFile("log/dot/graph.dot", EC, sys::fs::OF_Text);
         if (EC)
             return PreservedAnalyses::all();
     
@@ -34,6 +34,13 @@ namespace llvm {
 
         int InstID = 0;
         std::map<Instruction*, int> InstToID;
+        for (Function& F : M) {
+            for (BasicBlock& BB : F) {
+                for (Instruction& I : BB) {
+                    InstToID[&I] = InstID++;
+                }
+            }
+        }
     
         for (Function& f : M.functions()) {
             if (f.isDeclaration()) continue;
@@ -47,8 +54,7 @@ namespace llvm {
                 Instruction* PrevInst = nullptr;
     
                 for (Instruction& I : BB) {
-                    int currentID = InstID++;
-                    InstToID[&I] = currentID;
+                    int currentID = InstToID[&I];
                     
                     DotFile << "// Instruction: " << I << "\n";
                     DotFile << "    \"inst_" << currentID << "\" [label=\"{ " << I 
@@ -79,11 +85,10 @@ namespace llvm {
                     BasicBlock *Successor = Term->getSuccessor(i);
                     Instruction *FirstInst = &Successor->front();
                     
-                    if (InstToID.count(FirstInst)) {
-                        int DestID = InstToID[FirstInst];
-                        DotFile << "  \"inst_" << TermID << "\" -> \"inst_" << DestID 
-                                << "\" [penwidth=2, color=blue, weight=0];\n";
-                    }
+                    int TermID = InstToID[Term];
+                    int DestID = InstToID[FirstInst];
+                    DotFile << "  \"inst_" << TermID << "\" -> \"inst_" << DestID 
+                            << "\" [penwidth=2, color=blue, weight=0];\n";
                 }
             }
         }
@@ -130,7 +135,7 @@ namespace llvm {
 
 /**
  * plugin registration
- * to not install all llvm on my desk
+ * to not build all llvm on my desk
  */
 extern "C" LLVM_ATTRIBUTE_WEAK ::llvm::PassPluginLibraryInfo llvmGetPassPluginInfo() {
     return {
@@ -149,13 +154,4 @@ extern "C" LLVM_ATTRIBUTE_WEAK ::llvm::PassPluginLibraryInfo llvmGetPassPluginIn
                 });
         }
     };
-}
-
-extern "C" void __log_long_val(int id, long long val) {
-    static FILE *f = fopen("runtime_values.log", "a");
-    if (f) {
-        // Печатаем ID и значение (для указателей это будет hex адрес)
-        fprintf(f, "%d %lld\n", id, val); 
-        fflush(f);
-    }
 }

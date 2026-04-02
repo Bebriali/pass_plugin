@@ -5,7 +5,7 @@ static FILE* global_log_f = NULL;
 
 void init_log() {
     if (!global_log_f) {
-        global_log_f = fopen("values.log", "w");
+        global_log_f = fopen("log/values.log", "w");
     }
 }
 
