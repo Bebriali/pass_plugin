@@ -8,7 +8,7 @@ try:
             idx_str, val_str = line.split()
             idx, val = int(idx_str), int(val_str)
             
-            actual_id = idx - 10000 if idx >= 10000 else idx
+            actual_id = idx - 10000 if idx >= 10000 else idx # BUG # FIXME[flops]: Magic constant
             
             if actual_id not in values:
                 values[actual_id] = {'val': '?', 'addr': '?'}
