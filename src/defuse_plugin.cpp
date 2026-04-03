@@ -32,6 +32,11 @@ namespace llvm {
             {Type::getInt32Ty(ctx), Type::getInt32Ty(ctx)}, 
             false));
 
+        FunctionCallee logaddrfn = M.getOrInsertFunction("__log_addr", 
+            FunctionType::get(Type::getVoidTy(ctx), 
+            {Type::getInt32Ty(ctx), PointerType::get(ctx, 0)},
+            false));
+
         int InstID = 0;
         std::map<Instruction*, int> InstToID;
         for (Function& F : M) {
@@ -45,28 +50,52 @@ namespace llvm {
         for (Function& f : M.functions()) {
             if (f.isDeclaration()) continue;
     
+            DotFile << "  subgraph \"cluster_" << f.getName().str() << "\" {\n";
+
+            DotFile << "    label = \"Function: " << f.getName().str() << "\";\n";
+            DotFile << "    fontsize = 30;\n";
+            DotFile << "    fontname = \"Arial Bold\";\n";
+
+            DotFile << "    style = filled;\n";
+            DotFile << "    color = black;\n";
+            DotFile << "    fillcolor = white;\n";
+            DotFile << "    penwidth = 3.0;\n";
+
             for (BasicBlock& BB : f) {
                 DotFile << "  subgraph \"cluster_" << &BB << "\" {\n";
                 DotFile << "    label = \"Basic Block: " << &BB << "\";\n";
                 DotFile << "    style = filled;\n";
-                DotFile << "    color = lightgrey;\n";
+                DotFile << "    color = black;\n";
+                DotFile << "    penwidth = 2.0;\n";
+                DotFile << "    fillcolor = pink;\n";
     
                 Instruction* PrevInst = nullptr;
-    
+
+                std::vector<Instruction*> Insts;
                 for (Instruction& I : BB) {
-                    int currentID = InstToID[&I];
+                    Insts.push_back(&I);
+                }
+    
+                for (Instruction* I : Insts) {
+                    int currentID = InstToID[I];
                     
-                    DotFile << "// Instruction: " << I << "\n";
-                    DotFile << "    \"inst_" << currentID << "\" [label=\"{ " << I 
-                                << " | VALUE: <val_" << currentID << "> ? }\"];\n";
+                    DotFile << "// Instruction: " << *I << "\n";
+                    DotFile << "    \"inst_" << currentID << "\" [label=\"{ " << *I;
+                    if (!I->getType()->isVoidTy() || isa<StoreInst>(I)) {
+                        DotFile << " | VALUE: <val_" << currentID << "> ? ";
+                    }
+                    if (isa<LoadInst>(I) || isa<StoreInst>(I)) {
+                        DotFile << " | ADDR: <addr_" << currentID << "> ? ";
+                    }
+                    DotFile << " }\"];\n";
                     
                     if (PrevInst) {
                         // edge from prev to current instruction
                         DotFile << "    \"inst_" << InstToID[PrevInst] << "\" -> \"inst_" << currentID << "\" [style=bold];\n";
                     }
-                    PrevInst = &I;
+                    PrevInst = I;
     
-                    for (Use& U : I.operands()){
+                    for (Use& U : I->operands()){
     
                         Value* v = U.get(); 
                         if (Instruction* DefInst = dyn_cast<Instruction>(U)) {
@@ -75,7 +104,7 @@ namespace llvm {
                         }
                     }
                 }
-                DotFile << "  } // subgraph" << &BB << "\n";
+                DotFile << "  } // basic block " << &BB << "subgraph" << "\n";
                 
                 // connecting basic blocks
                 Instruction *Term = BB.getTerminator();
@@ -91,25 +120,52 @@ namespace llvm {
                             << "\" [penwidth=2, color=blue, weight=0];\n";
                 }
             }
+
+            DotFile << "  } // functional subgraph" << f.getName() << "\n";
         }
     
         DotFile << "} // def-use\n"; // closing graph def-use
-    
+
+        std::vector<Instruction*> InstrumentationList;
         for (auto const& [Inst, ID] : InstToID) {
+            InstrumentationList.push_back(Inst);
+        }
+    
+        for (Instruction* Inst : InstrumentationList) {
             if (Inst->isTerminator()) continue;
 
+            int ID = InstToID[Inst];
+
             IRBuilder<> Builder(ctx);
-            if (auto* Next = Inst->getNextNode()) {
-                Builder.SetInsertPoint(Next);
-            } else {
-                Builder.SetInsertPoint(Inst->getParent());
+
+            if (isa<StoreInst>(Inst)) {
+                Builder.SetInsertPoint(Inst);
+            } 
+            else {
+                auto* Next = Inst->getNextNode();
+                if (Next) Builder.SetInsertPoint(Next);
+                else Builder.SetInsertPoint(Inst->getParent());
             }
 
             Value* Valtolog = nullptr;
-            if (auto* SI = dyn_cast<StoreInst>(Inst)) {
-                Valtolog = SI->getValueOperand();
-            } else if (!Inst->getType()->isVoidTy()) {
+            Value* Addrtolog = nullptr;
+
+            // specific for load/store
+            if (auto* LI = dyn_cast<LoadInst>(Inst)) {
                 Valtolog = Inst;
+                Addrtolog = LI->getPointerOperand();
+            } 
+            else if (auto* SI = dyn_cast<StoreInst>(Inst)) {
+                Valtolog = SI->getValueOperand();
+                Addrtolog = SI->getPointerOperand();
+                Builder.SetInsertPoint(Inst);
+            } 
+            else if (!Inst->getType()->isVoidTy()) {
+                Valtolog = Inst;
+            }
+
+            if (Addrtolog) {
+                Builder.CreateCall(logaddrfn, {Builder.getInt32(ID + 10000), Addrtolog});
             }
 
             if (Valtolog) {
@@ -124,6 +180,7 @@ namespace llvm {
                     if (ValTy->isPointerTy()) {
                         CastedVal = Builder.CreatePtrToInt(Valtolog, Type::getInt64Ty(ctx));
                     }
+
                     Builder.CreateCall(loglongfn, {Builder.getInt32(ID), CastedVal});
                 }
             }
