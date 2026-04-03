@@ -17,6 +17,10 @@ namespace llvm {
         if (EC)
             return PreservedAnalyses::all();
     
+        // FIXME[flops]: Move ALL Dot dump functional into separate funcs/class or
+        // You can dump info about def use graph in machine-readable format like JSON/CSV
+        // And generate graph in overlay.py via pygraphviz/networkx e.t.c.
+
         DotFile << "digraph \"def-use\" {\n"; // the declaration of graph in *.dot
         DotFile << "  compound=true;\n";
         DotFile << "  node [shape=box, fontname=\"Courier\"];\n";
@@ -37,6 +41,8 @@ namespace llvm {
             {Type::getInt32Ty(ctx), PointerType::get(ctx, 0)},
             false));
 
+        // FIXME[flops]: Move it to the separate function
+        // P.S.[flops]: Better completely remove it, you can use just instruction address as instruction ID
         int InstID = 0;
         std::map<Instruction*, int> InstToID;
         for (Function& F : M) {
@@ -47,6 +53,8 @@ namespace llvm {
             }
         }
     
+        // FIXME[flops]: inconsistent naming: use only one specific case
+        // TODO[flops]: You may use just `for (Function& f : M)`
         for (Function& f : M.functions()) {
             if (f.isDeclaration()) continue;
     
@@ -71,12 +79,13 @@ namespace llvm {
     
                 Instruction* PrevInst = nullptr;
 
-                std::vector<Instruction*> Insts;
-                for (Instruction& I : BB) {
-                    Insts.push_back(&I);
-                }
-    
-                for (Instruction* I : Insts) {
+                // FIXME[flops]: Insts vector is useless, you can just iterate trough BB there --\ 
+                std::vector<Instruction*> Insts; //                                               |
+                for (Instruction& I : BB) { //                                                    |
+                    Insts.push_back(&I); //                                                       |
+                } //                                                                              |
+                //                                                                                |
+                for (Instruction* I : Insts) { // <----------------------------------------------/
                     int currentID = InstToID[I];
                     
                     DotFile << "// Instruction: " << *I << "\n";
@@ -126,19 +135,21 @@ namespace llvm {
     
         DotFile << "} // def-use\n"; // closing graph def-use
 
+        // FIXME[flops]: InstrumentationList is completely useless there
         std::vector<Instruction*> InstrumentationList;
         for (auto const& [Inst, ID] : InstToID) {
             InstrumentationList.push_back(Inst);
         }
     
+        // FIXME[flops]: `for (auto const& [Inst, ID]: InstToID)`
         for (Instruction* Inst : InstrumentationList) {
             if (Inst->isTerminator()) continue;
 
-            int ID = InstToID[Inst];
+            int ID = InstToID[Inst]; // FIXME[flops]: You already have instr ID
 
             IRBuilder<> Builder(ctx);
 
-            if (isa<StoreInst>(Inst)) {
+            if (isa<StoreInst>(Inst)) { // [flops]: Better add comment why StoreInst has different handle
                 Builder.SetInsertPoint(Inst);
             } 
             else {
@@ -165,13 +176,13 @@ namespace llvm {
             }
 
             if (Addrtolog) {
-                Builder.CreateCall(logaddrfn, {Builder.getInt32(ID + 10000), Addrtolog});
+                Builder.CreateCall(logaddrfn, {Builder.getInt32(ID + 10000), Addrtolog}); // BUG //FIXME[flops]: Magic constant, why 10000?
             }
 
             if (Valtolog) {
                 Type* ValTy = Valtolog->getType();
                 
-                if (ValTy->isIntegerTy() && ValTy->getIntegerBitWidth() <= 32) {
+                if (ValTy->isIntegerTy() && ValTy->getIntegerBitWidth() <= 32) { //FIXME[flops]: Magic hardcoded constant. You can make it more flexible via cast using Builder
                     Value* ExtVal = Builder.CreateZExt(Valtolog, Type::getInt32Ty(ctx));
                     Builder.CreateCall(logfn, {Builder.getInt32(ID), ExtVal});
                 }
@@ -185,7 +196,7 @@ namespace llvm {
                 }
             }
         }
-        
+
         return PreservedAnalyses::all();
     }
 } // namespace llvm
