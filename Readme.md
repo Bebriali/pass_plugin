@@ -102,3 +102,6 @@ then just run it
 ./run_all.sh <test_file> <args_for_test>
 ```
 using args from description of testing
+## graph example
+the result of running pass-plugin on test files is the following picture:
+![Def-Use Graph Example](log/pic/final.png)
