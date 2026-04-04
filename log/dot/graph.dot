@@ -1,82 +1,55 @@
 digraph "def-use" {
   compound=true;
-  node [shape=box, fontname="Courier"];
+  node [shape=record, fontname="Courier"];
   subgraph "cluster_main" {
     label = "Function: main";
-    fontsize = 30;
-    fontname = "Arial Bold";
-    style = filled;
-    color = black;
-    fillcolor = white;
-    penwidth = 3.0;
-  subgraph "cluster_0x55e1c3914140" {
-    label = "Basic Block: 0x55e1c3914140";
-    style = filled;
-    color = black;
-    penwidth = 2.0;
-    fillcolor = pink;
-// Instruction:   %1 = alloca i32, align 4
+    fontsize = 30; fontname = "Arial Bold";
+    style = filled; color = black; fillcolor = white; penwidth = 3.0;
+  subgraph "cluster_0x5fca4df8f430" {
+    label = "Basic Block: 0x5fca4df8f430";
+    style = filled; color = black; penwidth = 2.0; fillcolor = pink;
     "inst_0" [label="{   %1 = alloca i32, align 4 | VALUE: <val_0> ?  }"];
-// Instruction:   store i32 0, ptr %1, align 4
     "inst_1" [label="{   store i32 0, ptr %1, align 4 | VALUE: <val_1> ?  | ADDR: <addr_1> ?  }"];
-    "inst_0" -> "inst_1" [style=bold];
-    "inst_1" -> "inst_0" [style=dashed, color=red, constraint=false];
-// Instruction:   %2 = call i32 @add(i32 noundef 5, i32 noundef 3)
+    "inst_0" -> "inst_1" [style=bold, color=black];
+    "inst_1" -> "inst_0" [style=dashed, color=red];
     "inst_2" [label="{   %2 = call i32 @add(i32 noundef 5, i32 noundef 3) | VALUE: <val_2> ?  }"];
-    "inst_1" -> "inst_2" [style=bold];
-// Instruction:   %3 = call i32 (ptr, ...) @printf(ptr noundef @.str, i32 noundef %2)
+    "inst_1" -> "inst_2" [style=bold, color=black];
     "inst_3" [label="{   %3 = call i32 (ptr, ...) @printf(ptr noundef @.str, i32 noundef %2) | VALUE: <val_3> ?  }"];
-    "inst_2" -> "inst_3" [style=bold];
-    "inst_3" -> "inst_2" [style=dashed, color=red, constraint=false];
-// Instruction:   ret i32 0
+    "inst_2" -> "inst_3" [style=bold, color=black];
+    "inst_3" -> "inst_2" [style=dashed, color=red];
     "inst_4" [label="{   ret i32 0 }"];
-    "inst_3" -> "inst_4" [style=bold];
-  } // basic block 0x55e1c3914140subgraph
-  } // functional subgraphmain
+    "inst_3" -> "inst_4" [style=bold, color=black];
+  }
+  }
   subgraph "cluster_add" {
     label = "Function: add";
-    fontsize = 30;
-    fontname = "Arial Bold";
-    style = filled;
-    color = black;
-    fillcolor = white;
-    penwidth = 3.0;
-  subgraph "cluster_0x55e1c39175d0" {
-    label = "Basic Block: 0x55e1c39175d0";
-    style = filled;
-    color = black;
-    penwidth = 2.0;
-    fillcolor = pink;
-// Instruction:   %3 = alloca i32, align 4
+    fontsize = 30; fontname = "Arial Bold";
+    style = filled; color = black; fillcolor = white; penwidth = 3.0;
+  subgraph "cluster_0x5fca4df92720" {
+    label = "Basic Block: 0x5fca4df92720";
+    style = filled; color = black; penwidth = 2.0; fillcolor = pink;
     "inst_5" [label="{   %3 = alloca i32, align 4 | VALUE: <val_5> ?  }"];
-// Instruction:   %4 = alloca i32, align 4
     "inst_6" [label="{   %4 = alloca i32, align 4 | VALUE: <val_6> ?  }"];
-    "inst_5" -> "inst_6" [style=bold];
-// Instruction:   store i32 %0, ptr %3, align 4
+    "inst_5" -> "inst_6" [style=bold, color=black];
     "inst_7" [label="{   store i32 %0, ptr %3, align 4 | VALUE: <val_7> ?  | ADDR: <addr_7> ?  }"];
-    "inst_6" -> "inst_7" [style=bold];
-    "inst_7" -> "inst_5" [style=dashed, color=red, constraint=false];
-// Instruction:   store i32 %1, ptr %4, align 4
+    "inst_6" -> "inst_7" [style=bold, color=black];
+    "inst_7" -> "inst_5" [style=dashed, color=red];
     "inst_8" [label="{   store i32 %1, ptr %4, align 4 | VALUE: <val_8> ?  | ADDR: <addr_8> ?  }"];
-    "inst_7" -> "inst_8" [style=bold];
-    "inst_8" -> "inst_6" [style=dashed, color=red, constraint=false];
-// Instruction:   %5 = load i32, ptr %3, align 4
+    "inst_7" -> "inst_8" [style=bold, color=black];
+    "inst_8" -> "inst_6" [style=dashed, color=red];
     "inst_9" [label="{   %5 = load i32, ptr %3, align 4 | VALUE: <val_9> ?  | ADDR: <addr_9> ?  }"];
-    "inst_8" -> "inst_9" [style=bold];
-    "inst_9" -> "inst_5" [style=dashed, color=red, constraint=false];
-// Instruction:   %6 = load i32, ptr %4, align 4
+    "inst_8" -> "inst_9" [style=bold, color=black];
+    "inst_9" -> "inst_5" [style=dashed, color=red];
     "inst_10" [label="{   %6 = load i32, ptr %4, align 4 | VALUE: <val_10> ?  | ADDR: <addr_10> ?  }"];
-    "inst_9" -> "inst_10" [style=bold];
-    "inst_10" -> "inst_6" [style=dashed, color=red, constraint=false];
-// Instruction:   %7 = add nsw i32 %5, %6
+    "inst_9" -> "inst_10" [style=bold, color=black];
+    "inst_10" -> "inst_6" [style=dashed, color=red];
     "inst_11" [label="{   %7 = add nsw i32 %5, %6 | VALUE: <val_11> ?  }"];
-    "inst_10" -> "inst_11" [style=bold];
-    "inst_11" -> "inst_9" [style=dashed, color=red, constraint=false];
-    "inst_11" -> "inst_10" [style=dashed, color=red, constraint=false];
-// Instruction:   ret i32 %7
+    "inst_10" -> "inst_11" [style=bold, color=black];
+    "inst_11" -> "inst_9" [style=dashed, color=red];
+    "inst_11" -> "inst_10" [style=dashed, color=red];
     "inst_12" [label="{   ret i32 %7 }"];
-    "inst_11" -> "inst_12" [style=bold];
-    "inst_12" -> "inst_11" [style=dashed, color=red, constraint=false];
-  } // basic block 0x55e1c39175d0subgraph
-  } // functional subgraphadd
-} // def-use
+    "inst_11" -> "inst_12" [style=bold, color=black];
+    "inst_12" -> "inst_11" [style=dashed, color=red];
+  }
+  }
+}

@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/bash
 
 GREEN='\033[0;32m'
 RED='\033[0;31m'
@@ -35,13 +35,13 @@ echo -e "${GREEN}>>> Instrumentation...${NC}"
 opt -load-pass-plugin=./build/DefUsePlugin.so -passes="def-use-plugin" "prog/${NAME}.ll" -o "prog/${NAME}_inst.ll"
 
 echo -e "${GREEN}>>> Compiling instrumented binary...${NC}"
-clang++ "prog/${NAME}_inst.ll" scripts/logger.cpp -o run
+clang++ "prog/${NAME}_inst.ll" runtime/logger.cpp -o run
 
 echo -e "${GREEN}>>> Executing program with args: ${RUN_ARGS}${NC}"
 ./run ${RUN_ARGS}
 
 echo -e "${GREEN}>>> Generating graphs...${NC}"
-python3 scripts/overlay.py
+python3 runtime/overlay.py
 dot -Tpng log/dot/final.dot -o log/pic/final.png
 
 if [ -f log/pic/final.png ]; then
