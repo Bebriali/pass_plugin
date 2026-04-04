@@ -3,13 +3,13 @@
 This project implements an LLVM Pass Plugin that visualizes the **Def-Use** chain and Control Flow Graph (CFG) of a program, augmented with real-time values captured during execution.
 - it gets instructions, dumps them to the *.dot file and generates picture of it in logs/pics/.
 - graph contains:
-    - instructions  
+    - instructions
     - either addr's for store and load, val's and pointers as a result of implementation of each instruction
-- simultaneosly, it injects a logger functions' (defined in scripts/logger.cpp) calls after each instruction to capture values during the program execution.
-- after getting values for each instruction dumped in log/values.log python script (scripts/overlay.py) 
+- simultaneosly, it injects a logger functions' (defined in runtime/logger.cpp) calls after each instruction to capture values during the program execution.
+- after getting values for each instruction dumped in log/values.log python script (runtime/overlay.py)
 - connects them to each node on graph, creating a final visualized execution trace in in logs/pic/final.dot.
 
---- 
+---
 
 ## Requirements
 * **LLVM 14+** (including `opt` and `clang`)
@@ -40,7 +40,7 @@ then use the following format pasting values:
 ---
 
 ## how to run
-### generating IR test file from our main 
+### generating IR test file from our main
 
 ```
 clang -S -emit-llvm tests/test<i>.c -o prog/test.ll
@@ -63,7 +63,7 @@ you should see *.dot file appered in the working directory.
 
 ### compiling test program with our runtime logger
 ```
-clang prog/instrumented.ll scripts/logger.cpp -o run
+clang prog/instrumented.ll runtime/logger.cpp -o run
 ```
 after running with
 ```
@@ -74,7 +74,7 @@ you should see runtime.log appeared in the working directory
 ### overlaying values
 using script on python
 ```
-python3 scripts/overlay.py 
+python3 runtime/overlay.py
 ```
 ### viewing diffs in graph
 ```
@@ -88,9 +88,9 @@ dot -Tpng log/dot/final.dot -o log/pic/final.png
 ```
 cmake -DCMAKE_BUILD_TYPE=debug -S . -B build && cmake --build build && \
 opt -load-pass-plugin=./build/DefUsePlugin.so -passes="def-use-plugin" prog/test.ll -o prog/instrumented.ll && \
-clang++ prog/instrumented.ll scripts/logger.cpp -o run && \
+clang++ prog/instrumented.ll runtime/logger.cpp -o run && \
 ./run && \
-python3 scripts/overlay.py && \
+python3 runtime/overlay.py && \
 dot -Tpng log/dot/final.dot -o log/pic/final.png
 ```
 ## running using bash script
