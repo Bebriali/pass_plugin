@@ -74,15 +74,7 @@ you should see runtime.log appeared in the working directory
 ### overlaying values
 using script on python
 ```
-python3 runtime/overlay.py
-```
-### viewing diffs in graph
-```
-dot -Tpng log/dot/graph.dot -o log/pic/graph.png
-```
-or
-```
-dot -Tpng log/dot/final.dot -o log/pic/final.png
+python3 runtime/overlay_json.py
 ```
 ### full console input
 ```
@@ -90,8 +82,7 @@ cmake -DCMAKE_BUILD_TYPE=debug -S . -B build && cmake --build build && \
 opt -load-pass-plugin=./build/DefUsePlugin.so -passes="def-use-plugin" prog/test.ll -o prog/instrumented.ll && \
 clang++ prog/instrumented.ll runtime/logger.cpp -o run && \
 ./run && \
-python3 runtime/overlay.py && \
-dot -Tpng log/dot/final.dot -o log/pic/final.png
+python3 runtime/overlay_json.py && \
 ```
 ## running using bash script
 ```

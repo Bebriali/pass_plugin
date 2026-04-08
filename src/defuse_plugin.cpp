@@ -1,9 +1,8 @@
 #include <iostream>
 #include <unordered_map>
 
-#include "PassBuilder.h"
-#include "PassPlugin.h"
-#include "llvm/IR/Module.h"
+#include "llvm/Passes/PassBuilder.h"
+#include "llvm/Plugins/PassPlugin.h"
 #include "llvm/IR/IRBuilder.h"
 #include "defuse_plugin.hpp"
 #include "defuse_dump_json.hpp"
@@ -11,8 +10,17 @@
 using namespace llvm;
 
 namespace llvm {
+    PreservedAnalyses DefUsePluginPass::run(Module& M, ModuleAnalysisManager &AM) {
+        auto setup = prepareContext(M);
+        
+        dumpDefuse(M, setup.dumper);
 
-    RuntimeInfo DefUsePluginPass::setupRuntime(Module& M, LLVMContext& ctx) {
+        instrumentation(M, setup);
+
+        return PreservedAnalyses::none();
+    }
+    
+    DefUsePluginPass::RuntimeInfo DefUsePluginPass::setupRuntime(Module& M, LLVMContext& ctx) {
         Type *I64Ty = Type::getInt64Ty(ctx);
         Type *PtrTy = PointerType::get(ctx, 0);
         Type *VoidTy = Type::getVoidTy(ctx);
@@ -23,32 +31,13 @@ namespace llvm {
         };
     }
 
-    SetupContext DefUsePluginPass::initSetup(Module& M) {
+    DefUsePluginPass::SetupContext DefUsePluginPass::prepareContext(Module& M) {
         JsonDumper dumper("log/json/ir_dump.json");
 
         LLVMContext &ctx = M.getContext();
-        FunctionCallee loglongfn = M.getOrInsertFunction("log_long_val",
-            FunctionType::get(Type::getVoidTy(ctx),
-            {Type::getInt64Ty(ctx), Type::getInt64Ty(ctx)},
-            false));
+        RuntimeInfo rt = setupRuntime(M, ctx);
 
-        FunctionCallee logfn = M.getOrInsertFunction("log_val",
-            FunctionType::get(Type::getVoidTy(ctx),
-            {Type::getInt64Ty(ctx), Type::getInt32Ty(ctx)},
-            false));
-
-        FunctionCallee logaddrfn = M.getOrInsertFunction("log_addr",
-            FunctionType::get(Type::getVoidTy(ctx),
-            {Type::getInt64Ty(ctx), PointerType::get(ctx, 0)},
-            false));
-
-        FunctionCallee logmemfn = M.getOrInsertFunction("log_mem",
-            FunctionType::get(Type::getVoidTy(ctx),
-            {Type::getInt64Ty(ctx), Type::getInt64Ty(ctx), PointerType::get(ctx, 0)},
-            false));
-
-
-        return {dumper, ctx, loglongfn, logfn, logaddrfn, logmemfn};
+        return {std::move(dumper), ctx, rt};
     }
     
     void DefUsePluginPass::dumpDefuse(Module& M, JsonDumper& dumper) {
@@ -94,7 +83,7 @@ namespace llvm {
 
                         Value* v = U.get();
                         if (Instruction* DefInst = dyn_cast<Instruction>(v)) {
-                            dumper.addEdge(instId, toHexStr(DefInst), "def-use", "red");
+                            dumper.addEdge(instId, toHexStr(DefInst), "use", "red");
                         }
                     }
                 }
@@ -133,12 +122,11 @@ namespace llvm {
                             Builder.CreatePtrToInt(Val, I64Ty) : 
                             Builder.CreateIntCast(Val, I64Ty, false);
 
-                        Builder.CreateCall(S.logmemfn, {Builder.getInt64(ID), CastedVal, Addr});
+                        Builder.CreateCall(S.rt.logmemfn, {Builder.getInt64(ID), CastedVal, Addr});
                     }
                     else if (auto* LI = dyn_cast<LoadInst>(&I)) {
                         auto* Next = I.getNextNode();
                         if (Next) Builder.SetInsertPoint(Next);
-                        else Builder.SetInsertPoint(&BB);
 
                         Value* Addr = LI->getPointerOperand();
                         Value* CastedVal = nullptr;
@@ -150,13 +138,12 @@ namespace llvm {
                         }
 
                         if (CastedVal) {
-                            Builder.CreateCall(S.logmemfn, {Builder.getInt64(ID), CastedVal, Addr});
+                            Builder.CreateCall(S.rt.logmemfn, {Builder.getInt64(ID), CastedVal, Addr});
                         }
                     }
                     else if (!I.getType()->isVoidTy()) {
                         auto* Next = I.getNextNode();
                         if (Next) Builder.SetInsertPoint(Next);
-                        else Builder.SetInsertPoint(&BB);
 
                         Value* CastedVal = nullptr;
                         if (I.getType()->isIntegerTy()) {
@@ -166,22 +153,12 @@ namespace llvm {
                         }
 
                         if (CastedVal) {
-                            // log_val(ID, Value) -> 2 колонки
-                            Builder.CreateCall(S.loglongfn, {Builder.getInt64(ID), CastedVal});
+                            Builder.CreateCall(S.rt.loglongfn, {Builder.getInt64(ID), CastedVal});
                         }
                     }
                 }
             }
         }
-    }
-    PreservedAnalyses DefUsePluginPass::run(Module& M, ModuleAnalysisManager &AM) {
-        auto setup = initSetup(M);
-        
-        dumpDefuse(M, setup.dumper);
-
-        instrumentation(M, setup);
-
-        return PreservedAnalyses::none();
     }
 } // namespace llvm
 

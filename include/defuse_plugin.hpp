@@ -4,24 +4,17 @@
 #include "defuse_dump_json.hpp"
 
 namespace llvm {
-    struct SetupContext {
-        JsonDumper dumper;
-        LLVMContext &ctx;
-        FunctionCallee loglongfn;
-        FunctionCallee logfn;
-        FunctionCallee logaddrfn;
-        FunctionCallee logmemfn;
-    };
-
-    struct RuntimeInfo {
-        FunctionCallee loglongfn;
-        FunctionCallee logmemfn;
-    };
-
     class DefUsePluginPass : public PassInfoMixin<DefUsePluginPass> {
-        static const uint32_t ADDR_FLAG = 0x80000000;
+        struct RuntimeInfo {
+            FunctionCallee loglongfn; // only value
+            FunctionCallee logmemfn;  // value + addr
+        };
+        struct SetupContext {
+            JsonDumper dumper;
+            LLVMContext &ctx;
+            RuntimeInfo rt;
+        };
     public:
-
         /**
          * analyses module
          * dumping def-use graph to *.dot file
@@ -30,10 +23,9 @@ namespace llvm {
         PreservedAnalyses run(Module& M, ModuleAnalysisManager& AM);
     private:
         RuntimeInfo setupRuntime(Module& M, LLVMContext& ctx);
-        SetupContext initSetup(Module& M);
+        SetupContext prepareContext(Module& M);
         void dumpDefuse(Module& M, JsonDumper& dumper);
         void instrumentation(Module& M, SetupContext& S);
-
     };
 } // namespace llvm
 

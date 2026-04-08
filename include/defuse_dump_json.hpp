@@ -19,7 +19,17 @@ namespace llvm {
 
     public:
         JsonDumper() = default;
-        JsonDumper(std::string Filename);
+        
+        JsonDumper(std::string Filename) : Filename(std::move(Filename)) {
+            root["functions"] = nlohmann::json::array();
+            root["edges"] = nlohmann::json::array();
+        }
+
+        ~JsonDumper() {
+            if (!Filename.empty()) {
+                save();
+            }
+        }
 
         void addFunction(std::string Name);
         void addBasicBlock(std::string ID, std::string Label);

@@ -1,12 +1,6 @@
 #include "defuse_dump_json.hpp"
 
 namespace llvm {
-
-JsonDumper::JsonDumper(std::string Filename) : Filename(std::move(Filename)) {
-    root["functions"] = json::array();
-    root["edges"] = json::array();
-}
-
 void JsonDumper::addFunction(std::string Name) {
     root["functions"].push_back({
         {"name", std::move(Name)},

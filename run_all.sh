@@ -19,7 +19,7 @@ FILENAME=$(basename -- "$SOURCE_FILE")
 NAME="${FILENAME%.*}"
 
 echo -e "${GREEN}>>> Cleaning old artifacts...${NC}"
-rm -f run log/values.log log/dot/*.dot log/json/*.json log/pic/*.png prog/*.ll
+rm -f run log/values.log log/json/*.json log/pic/*.png prog/*.ll
 
 echo -e "${GREEN}>>> Building plugin...${NC}"
 cmake -S . -B build && cmake --build build
