@@ -1,0 +1,226 @@
+{
+    "edges": [
+        {
+            "color": "black",
+            "from": "0x560f2af4d220",
+            "to": "0x560f2af4db40",
+            "type": "cfg"
+        },
+        {
+            "color": "red",
+            "from": "0x560f2af4db40",
+            "to": "0x560f2af4d220",
+            "type": "def-use"
+        },
+        {
+            "color": "black",
+            "from": "0x560f2af4db40",
+            "to": "0x560f2af4e340",
+            "type": "cfg"
+        },
+        {
+            "color": "black",
+            "from": "0x560f2af4e340",
+            "to": "0x560f2af4e530",
+            "type": "cfg"
+        },
+        {
+            "color": "red",
+            "from": "0x560f2af4e530",
+            "to": "0x560f2af4e340",
+            "type": "def-use"
+        },
+        {
+            "color": "black",
+            "from": "0x560f2af4e530",
+            "to": "0x560f2af4e600",
+            "type": "cfg"
+        },
+        {
+            "color": "black",
+            "from": "0x560f2af4e280",
+            "to": "0x560f2af4e410",
+            "type": "cfg"
+        },
+        {
+            "color": "black",
+            "from": "0x560f2af4e410",
+            "to": "0x560f2af4e9a0",
+            "type": "cfg"
+        },
+        {
+            "color": "red",
+            "from": "0x560f2af4e9a0",
+            "to": "0x560f2af4e280",
+            "type": "def-use"
+        },
+        {
+            "color": "black",
+            "from": "0x560f2af4e9a0",
+            "to": "0x560f2af4ea40",
+            "type": "cfg"
+        },
+        {
+            "color": "red",
+            "from": "0x560f2af4ea40",
+            "to": "0x560f2af4e410",
+            "type": "def-use"
+        },
+        {
+            "color": "black",
+            "from": "0x560f2af4ea40",
+            "to": "0x560f2af4eac0",
+            "type": "cfg"
+        },
+        {
+            "color": "red",
+            "from": "0x560f2af4eac0",
+            "to": "0x560f2af4e280",
+            "type": "def-use"
+        },
+        {
+            "color": "black",
+            "from": "0x560f2af4eac0",
+            "to": "0x560f2af4eb40",
+            "type": "cfg"
+        },
+        {
+            "color": "red",
+            "from": "0x560f2af4eb40",
+            "to": "0x560f2af4e410",
+            "type": "def-use"
+        },
+        {
+            "color": "black",
+            "from": "0x560f2af4eb40",
+            "to": "0x560f2af3b5c0",
+            "type": "cfg"
+        },
+        {
+            "color": "red",
+            "from": "0x560f2af3b5c0",
+            "to": "0x560f2af4eac0",
+            "type": "def-use"
+        },
+        {
+            "color": "red",
+            "from": "0x560f2af3b5c0",
+            "to": "0x560f2af4eb40",
+            "type": "def-use"
+        },
+        {
+            "color": "black",
+            "from": "0x560f2af3b5c0",
+            "to": "0x560f2af4ebc0",
+            "type": "cfg"
+        },
+        {
+            "color": "red",
+            "from": "0x560f2af4ebc0",
+            "to": "0x560f2af3b5c0",
+            "type": "def-use"
+        }
+    ],
+    "functions": [
+        {
+            "blocks": [
+                {
+                    "id": "0x560f2af4afe0",
+                    "instructions": [
+                        {
+                            "has_addr": false,
+                            "has_val": true,
+                            "id": "0x560f2af4d220",
+                            "text": "  %1 = alloca i32, align 4"
+                        },
+                        {
+                            "has_addr": true,
+                            "has_val": true,
+                            "id": "0x560f2af4db40",
+                            "text": "  store i32 0, ptr %1, align 4"
+                        },
+                        {
+                            "has_addr": false,
+                            "has_val": true,
+                            "id": "0x560f2af4e340",
+                            "text": "  %2 = call i32 @add(i32 noundef 5, i32 noundef 3)"
+                        },
+                        {
+                            "has_addr": false,
+                            "has_val": true,
+                            "id": "0x560f2af4e530",
+                            "text": "  %3 = call i32 (ptr, ...) @printf(ptr noundef @.str, i32 noundef %2)"
+                        },
+                        {
+                            "has_addr": false,
+                            "has_val": false,
+                            "id": "0x560f2af4e600",
+                            "text": "  ret i32 0"
+                        }
+                    ],
+                    "label": "BB: 0x560f2af4afe0"
+                }
+            ],
+            "name": "main"
+        },
+        {
+            "blocks": [
+                {
+                    "id": "0x560f2af4e470",
+                    "instructions": [
+                        {
+                            "has_addr": false,
+                            "has_val": true,
+                            "id": "0x560f2af4e280",
+                            "text": "  %3 = alloca i32, align 4"
+                        },
+                        {
+                            "has_addr": false,
+                            "has_val": true,
+                            "id": "0x560f2af4e410",
+                            "text": "  %4 = alloca i32, align 4"
+                        },
+                        {
+                            "has_addr": true,
+                            "has_val": true,
+                            "id": "0x560f2af4e9a0",
+                            "text": "  store i32 %0, ptr %3, align 4"
+                        },
+                        {
+                            "has_addr": true,
+                            "has_val": true,
+                            "id": "0x560f2af4ea40",
+                            "text": "  store i32 %1, ptr %4, align 4"
+                        },
+                        {
+                            "has_addr": true,
+                            "has_val": true,
+                            "id": "0x560f2af4eac0",
+                            "text": "  %5 = load i32, ptr %3, align 4"
+                        },
+                        {
+                            "has_addr": true,
+                            "has_val": true,
+                            "id": "0x560f2af4eb40",
+                            "text": "  %6 = load i32, ptr %4, align 4"
+                        },
+                        {
+                            "has_addr": false,
+                            "has_val": true,
+                            "id": "0x560f2af3b5c0",
+                            "text": "  %7 = add nsw i32 %5, %6"
+                        },
+                        {
+                            "has_addr": false,
+                            "has_val": false,
+                            "id": "0x560f2af4ebc0",
+                            "text": "  ret i32 %7"
+                        }
+                    ],
+                    "label": "BB: 0x560f2af4e470"
+                }
+            ],
+            "name": "add"
+        }
+    ]
+}

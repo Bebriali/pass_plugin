@@ -1,66 +1,92 @@
 #include <iostream>
-#include <map>
+#include <unordered_map>
 
 #include "PassBuilder.h"
 #include "PassPlugin.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/IRBuilder.h"
 #include "defuse_plugin.hpp"
+#include "defuse_dump_json.hpp"
 
 using namespace llvm;
 
 namespace llvm {
 
-    PreservedAnalyses DefUsePluginPass::run(Module& M, ModuleAnalysisManager &AM) {
-        dumper = GraphDumper("log/dot/graph.dot");
+    RuntimeInfo DefUsePluginPass::setupRuntime(Module& M, LLVMContext& ctx) {
+        Type *I64Ty = Type::getInt64Ty(ctx);
+        Type *PtrTy = PointerType::get(ctx, 0);
+        Type *VoidTy = Type::getVoidTy(ctx);
 
-        dumper.dumpGraphDef();
+        return {
+            M.getOrInsertFunction("log_long_val", FunctionType::get(VoidTy, {I64Ty, I64Ty}, false)),
+            M.getOrInsertFunction("log_mem", FunctionType::get(VoidTy, {I64Ty, I64Ty, PtrTy}, false))
+        };
+    }
+
+    SetupContext DefUsePluginPass::initSetup(Module& M) {
+        JsonDumper dumper("log/json/ir_dump.json");
 
         LLVMContext &ctx = M.getContext();
         FunctionCallee loglongfn = M.getOrInsertFunction("log_long_val",
             FunctionType::get(Type::getVoidTy(ctx),
-            {Type::getInt32Ty(ctx), Type::getInt64Ty(ctx)},
+            {Type::getInt64Ty(ctx), Type::getInt64Ty(ctx)},
             false));
 
         FunctionCallee logfn = M.getOrInsertFunction("log_val",
             FunctionType::get(Type::getVoidTy(ctx),
-            {Type::getInt32Ty(ctx), Type::getInt32Ty(ctx)},
+            {Type::getInt64Ty(ctx), Type::getInt32Ty(ctx)},
             false));
 
         FunctionCallee logaddrfn = M.getOrInsertFunction("log_addr",
             FunctionType::get(Type::getVoidTy(ctx),
-            {Type::getInt32Ty(ctx), PointerType::get(ctx, 0)},
+            {Type::getInt64Ty(ctx), PointerType::get(ctx, 0)},
             false));
 
-        // P.S.[flops]: Better completely remove it, you can use just instruction address as instruction ID
-        std::map<Instruction*, int> InstToID;
-        buildInstMap(M, InstToID);
+        FunctionCallee logmemfn = M.getOrInsertFunction("log_mem",
+            FunctionType::get(Type::getVoidTy(ctx),
+            {Type::getInt64Ty(ctx), Type::getInt64Ty(ctx), PointerType::get(ctx, 0)},
+            false));
+
+
+        return {dumper, ctx, loglongfn, logfn, logaddrfn, logmemfn};
+    }
+    
+    void DefUsePluginPass::dumpDefuse(Module& M, JsonDumper& dumper) {
+        auto toHexStr = [](void* P) -> std::string {
+            std::stringstream ss;
+            ss << "0x" << std::hex << reinterpret_cast<uintptr_t>(P);
+            return ss.str();
+        };
+    
+        auto instToString = [](Instruction& I) -> std::string {
+            std::string s;
+            raw_string_ostream os(s);
+            I.print(os);
+            return s;
+        };
 
         for (Function& F : M) {
             if (F.isDeclaration()) continue;
 
-            dumper.openSubgraphF(F.getName());
+            dumper.addFunction(F.getName().str());
 
             for (BasicBlock& BB : F) {
-                dumper.openSubgraphBB(&BB);
+                std::string bbId = toHexStr(&BB);
+                dumper.addBasicBlock(bbId, "BB: " + bbId);
 
                 Instruction* PrevInst = nullptr;
 
                 for (Instruction& I : BB) {
-                    int currentID = InstToID[&I];
+                    std::string instId = toHexStr(&I);
 
-                    dumper.dumpInstruction(I, currentID);
-                    if (!I.getType()->isVoidTy() || isa<StoreInst>(I)) {
-                        dumper.dumpVal(currentID);
-                    }
-                    if (isa<LoadInst>(I) || isa<StoreInst>(I)) {
-                        dumper.dumpAddr(currentID);
-                    }
-                    dumper.dumpClose();
+                    bool hasV = !I.getType()->isVoidTy() || isa<StoreInst>(I);
+                    bool hasA = isa<LoadInst>(I) || isa<StoreInst>(I);
 
+                    dumper.addInstruction(instId, instToString(I), hasV, hasA);
+                
                     if (PrevInst) {
                         // edge from prev to current instruction
-                        dumper.addEdge(InstToID[PrevInst], currentID, "bold");
+                        dumper.addEdge(toHexStr(PrevInst), instId, "cfg", "black");
                     }
                     PrevInst = &I;
 
@@ -68,99 +94,94 @@ namespace llvm {
 
                         Value* v = U.get();
                         if (Instruction* DefInst = dyn_cast<Instruction>(v)) {
-                            dumper.addEdge(currentID, InstToID[DefInst], "dashed", "red");
+                            dumper.addEdge(instId, toHexStr(DefInst), "def-use", "red");
                         }
                     }
                 }
-                dumper.closeSubgraph();
 
                 // connecting basic blocks
                 Instruction *Term = BB.getTerminator();
-                int TermID = InstToID[Term];
 
                 for (unsigned i = 0; i < Term->getNumSuccessors(); ++i) {
                     BasicBlock *Successor = Term->getSuccessor(i);
-                    Instruction *FirstInst = &Successor->front();
-
-                    int TermID = InstToID[Term];
-                    int DestID = InstToID[FirstInst];
-                    dumper.addEdge(TermID, DestID, "bold", "blue");
-                }
-            }
-            dumper.closeSubgraph();
-        }
-        dumper.closeGraph();
-        dumper.close();
-
-        for (auto const& [Inst, ID] : InstToID) {
-            if (Inst->isTerminator()) continue;
-
-            IRBuilder<> Builder(ctx);
-
-            /** [Explanation]:
-             * store insert point should be before the instruction execution cause
-             * it does not produce any value
-             * we know both ptr and val before storing
-             * after the store ptr or val can be unreachable
-             * (if their timeline is over)
-             */
-            if (isa<StoreInst>(Inst)) {
-                Builder.SetInsertPoint(Inst);
-            }
-            else {
-                auto* Next = Inst->getNextNode();
-                if (Next) Builder.SetInsertPoint(Next);
-                else Builder.SetInsertPoint(Inst->getParent());
-            }
-
-            Value* Valtolog = nullptr;
-            Value* Addrtolog = nullptr;
-
-            // specific for load/store as for the only ones working with addr's
-            if (auto* LI = dyn_cast<LoadInst>(Inst)) {
-                Valtolog = Inst;
-                Addrtolog = LI->getPointerOperand();
-            }
-            else if (auto* SI = dyn_cast<StoreInst>(Inst)) {
-                Valtolog = SI->getValueOperand();
-                Addrtolog = SI->getPointerOperand();
-                Builder.SetInsertPoint(Inst);
-            }
-            else if (!Inst->getType()->isVoidTy()) {
-                Valtolog = Inst;
-            }
-
-            if (Addrtolog) {
-                // using specific flag for addr values, cause default values have
-                // the same instruction id
-                Builder.CreateCall(logaddrfn, {Builder.getInt32(ID | ADDR_FLAG), Addrtolog});
-            }
-
-            if (Valtolog) {
-                Type* ValTy = Valtolog->getType();
-                Type* I32Ty = Type::getInt32Ty(ctx);
-                Type* I64Ty = Type::getInt64Ty(ctx);
-
-                if (ValTy->isIntegerTy()) {
-                    unsigned BitWidth = ValTy->getIntegerBitWidth();
-
-                    if (BitWidth <= 32) {
-                        Value* ExtVal = Builder.CreateIntCast(Valtolog, I32Ty, false);
-                        Builder.CreateCall(logfn, {Builder.getInt32(ID), ExtVal});
-                    }
-                    else {
-                        Value* ExtVal = Builder.CreateIntCast(Valtolog, I64Ty, false);
-                        Builder.CreateCall(loglongfn, {Builder.getInt32(ID), ExtVal});
-                    }
-                }
-                else if (ValTy->isPointerTy()) {
-                    Value* CastedPtr = Builder.CreatePtrToInt(Valtolog, I64Ty);
-                    Builder.CreateCall(loglongfn, {Builder.getInt32(ID), CastedPtr});
+                    dumper.addEdge(toHexStr(Term), toHexStr(&Successor->front()), "cfg-link", "blue");
                 }
             }
         }
+        dumper.save();
+    }
 
-        return PreservedAnalyses::all();
+    void DefUsePluginPass::instrumentation(Module& M, SetupContext& S) {
+        for (Function& F : M) {
+            if (F.isDeclaration()) continue;
+            for (BasicBlock& BB : F) {
+                for (Instruction& I : BB) {
+
+                    if (I.isTerminator()) continue;
+                    
+                    IRBuilder<> Builder(S.ctx);
+                    uint64_t ID = reinterpret_cast<uintptr_t>(&I);
+                    Type* I64Ty = Type::getInt64Ty(S.ctx);
+        
+                    if (auto* SI = dyn_cast<StoreInst>(&I)) {
+                        Builder.SetInsertPoint(&I);
+        
+                        Value* Val = SI->getValueOperand();
+                        Value* Addr = SI->getPointerOperand();
+                        
+                        Value* CastedVal = Val->getType()->isPointerTy() ? 
+                            Builder.CreatePtrToInt(Val, I64Ty) : 
+                            Builder.CreateIntCast(Val, I64Ty, false);
+
+                        Builder.CreateCall(S.logmemfn, {Builder.getInt64(ID), CastedVal, Addr});
+                    }
+                    else if (auto* LI = dyn_cast<LoadInst>(&I)) {
+                        auto* Next = I.getNextNode();
+                        if (Next) Builder.SetInsertPoint(Next);
+                        else Builder.SetInsertPoint(&BB);
+
+                        Value* Addr = LI->getPointerOperand();
+                        Value* CastedVal = nullptr;
+
+                        if (I.getType()->isPointerTy()) {
+                            CastedVal = Builder.CreatePtrToInt(&I, I64Ty);
+                        } else {
+                            CastedVal = Builder.CreateIntCast(&I, I64Ty, false);
+                        }
+
+                        if (CastedVal) {
+                            Builder.CreateCall(S.logmemfn, {Builder.getInt64(ID), CastedVal, Addr});
+                        }
+                    }
+                    else if (!I.getType()->isVoidTy()) {
+                        auto* Next = I.getNextNode();
+                        if (Next) Builder.SetInsertPoint(Next);
+                        else Builder.SetInsertPoint(&BB);
+
+                        Value* CastedVal = nullptr;
+                        if (I.getType()->isIntegerTy()) {
+                            CastedVal = Builder.CreateIntCast(&I, I64Ty, false);
+                        } else if (I.getType()->isPointerTy()) {
+                            CastedVal = Builder.CreatePtrToInt(&I, I64Ty);
+                        }
+
+                        if (CastedVal) {
+                            // log_val(ID, Value) -> 2 колонки
+                            Builder.CreateCall(S.loglongfn, {Builder.getInt64(ID), CastedVal});
+                        }
+                    }
+                }
+            }
+        }
+    }
+    PreservedAnalyses DefUsePluginPass::run(Module& M, ModuleAnalysisManager &AM) {
+        auto setup = initSetup(M);
+        
+        dumpDefuse(M, setup.dumper);
+
+        instrumentation(M, setup);
+
+        return PreservedAnalyses::none();
     }
 } // namespace llvm
 

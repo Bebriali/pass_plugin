@@ -19,7 +19,7 @@ FILENAME=$(basename -- "$SOURCE_FILE")
 NAME="${FILENAME%.*}"
 
 echo -e "${GREEN}>>> Cleaning old artifacts...${NC}"
-rm -f run log/values.log log/dot/*.dot log/pic/*.png prog/*.ll
+rm -f run log/values.log log/dot/*.dot log/json/*.json log/pic/*.png prog/*.ll
 
 echo -e "${GREEN}>>> Building plugin...${NC}"
 cmake -S . -B build && cmake --build build
@@ -41,8 +41,7 @@ echo -e "${GREEN}>>> Executing program with args: ${RUN_ARGS}${NC}"
 ./run ${RUN_ARGS}
 
 echo -e "${GREEN}>>> Generating graphs...${NC}"
-python3 runtime/overlay.py
-dot -Tpng log/dot/final.dot -o log/pic/final.png
+python3 runtime/overlay_json.py
 
 if [ -f log/pic/final.png ]; then
     echo -e "${GREEN}>>> DONE! Result: log/pic/final.png${NC}"
