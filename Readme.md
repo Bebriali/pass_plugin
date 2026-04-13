@@ -12,7 +12,7 @@ This project implements an LLVM Pass Plugin that visualizes the **Def-Use** chai
 ---
 
 ## Requirements
-* **LLVM 14+** (including `opt` and `clang`)
+* **LLVM 14+** (including `clang`)
 * **Graphviz** (`dot` utility)
 * **Python 3.x**
 * **CMake 3.10+**
@@ -39,56 +39,24 @@ then use the following format pasting values:
 ```
 ---
 
-## how to run
-### generating IR test file from our main
-
+## how to run using bash script
+firstly, build and activate venv area:
 ```
-clang -S -emit-llvm tests/test<i>.c -o prog/test.ll
+python -m venv venv
 ```
-... where i is a test number.
-
-### compiling our project
-
+...for building and
 ```
-cmake -DCMAKE_BUILD_TYPE=debug -S . -B build && cmake --build build
+source venv/bin/activate
 ```
-
-running it on opt and saving to instrumented.ll file for disabling affect on test.ll file
-
+...or
 ```
-opt -load-pass-plugin=./build/DefUsePlugin.so -passes="def-use-plugin" prog/test.ll -o prog/instrumented.ll
+venv/scripts/activate
 ```
-... where i is a test number.
-you should see *.dot file appered in the working directory.
-
-### compiling test program with our runtime logger
-```
-clang prog/instrumented.ll runtime/logger.cpp -o run
-```
-after running with
-```
-./run
-```
-you should see runtime.log appeared in the working directory
-
-### overlaying values
-using script on python
-```
-python3 runtime/overlay_json.py
-```
-### full console input
-```
-cmake -DCMAKE_BUILD_TYPE=debug -S . -B build && cmake --build build && \
-opt -load-pass-plugin=./build/DefUsePlugin.so -passes="def-use-plugin" prog/test.ll -o prog/instrumented.ll && \
-clang++ prog/instrumented.ll runtime/logger.cpp -o run && \
-./run && \
-python3 runtime/overlay_json.py && \
-```
-## running using bash script
+for activating it.
 ```
 chmod +x run_all.sh
 ```
-then just run it
+then just run
 ```
 ./run_all.sh <test_file> <args_for_test>
 ```

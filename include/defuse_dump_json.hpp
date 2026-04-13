@@ -6,37 +6,28 @@
 #include <vector>
 #include <fstream>
 
-using json = nlohmann::json;
-
 namespace llvm {
     class JsonDumper {
     private:
         nlohmann::json root;
-        std::string Filename;
+        std::string filename;
         
-        nlohmann::json* currentFunc = nullptr;
-        nlohmann::json* currentBB = nullptr;
+        nlohmann::json* current_func = nullptr;
+        nlohmann::json* current_block = nullptr;
 
     public:
         JsonDumper() = default;
         
-        JsonDumper(std::string Filename) : Filename(std::move(Filename)) {
-            root["functions"] = nlohmann::json::array();
-            root["edges"] = nlohmann::json::array();
-        }
+        JsonDumper(std::string filename);
 
-        ~JsonDumper() {
-            if (!Filename.empty()) {
-                save();
-            }
-        }
+        ~JsonDumper();
 
-        void addFunction(std::string Name);
-        void addBasicBlock(std::string ID, std::string Label);
+        void addFunction(std::string name);
+        void addBasicBlock(std::string id);
         
-        void addInstruction(std::string ID, std::string Text, bool hasVal, bool hasAddr);
+        void addInstruction(std::string id, std::string text, bool has_val, bool has_addr);
 
-        void addEdge(std::string FromID, std::string ToID, std::string Type, std::string Color);
+        void addEdge(std::string fromID, std::string toID, std::string type, std::string color);
 
         void save();
     };

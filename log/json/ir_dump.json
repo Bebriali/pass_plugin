@@ -2,122 +2,122 @@
     "edges": [
         {
             "color": "black",
-            "from": "0x55d8e87ef220",
-            "to": "0x55d8e87efb40",
+            "from": "0x56073bbdb3c0",
+            "to": "0x56073bc20140",
             "type": "cfg"
         },
         {
             "color": "red",
-            "from": "0x55d8e87efb40",
-            "to": "0x55d8e87ef220",
+            "from": "0x56073bc20140",
+            "to": "0x56073bbdb3c0",
             "type": "use"
         },
         {
             "color": "black",
-            "from": "0x55d8e87efb40",
-            "to": "0x55d8e87f0340",
+            "from": "0x56073bc20140",
+            "to": "0x56073bc2b820",
             "type": "cfg"
         },
         {
             "color": "black",
-            "from": "0x55d8e87f0340",
-            "to": "0x55d8e87f0530",
+            "from": "0x56073bc2b820",
+            "to": "0x56073bc2b990",
             "type": "cfg"
         },
         {
             "color": "red",
-            "from": "0x55d8e87f0530",
-            "to": "0x55d8e87f0340",
+            "from": "0x56073bc2b990",
+            "to": "0x56073bc2b820",
             "type": "use"
         },
         {
             "color": "black",
-            "from": "0x55d8e87f0530",
-            "to": "0x55d8e87f0600",
+            "from": "0x56073bc2b990",
+            "to": "0x56073bc06ee0",
             "type": "cfg"
         },
         {
             "color": "black",
-            "from": "0x55d8e87f0280",
-            "to": "0x55d8e87f0410",
+            "from": "0x56073bc54ba0",
+            "to": "0x56073bc55ad0",
             "type": "cfg"
         },
         {
             "color": "black",
-            "from": "0x55d8e87f0410",
-            "to": "0x55d8e87f09a0",
+            "from": "0x56073bc55ad0",
+            "to": "0x56073bc54c40",
             "type": "cfg"
         },
         {
             "color": "red",
-            "from": "0x55d8e87f09a0",
-            "to": "0x55d8e87f0280",
+            "from": "0x56073bc54c40",
+            "to": "0x56073bc54ba0",
             "type": "use"
         },
         {
             "color": "black",
-            "from": "0x55d8e87f09a0",
-            "to": "0x55d8e87f0a40",
+            "from": "0x56073bc54c40",
+            "to": "0x56073bc55b70",
             "type": "cfg"
         },
         {
             "color": "red",
-            "from": "0x55d8e87f0a40",
-            "to": "0x55d8e87f0410",
+            "from": "0x56073bc55b70",
+            "to": "0x56073bc55ad0",
             "type": "use"
         },
         {
             "color": "black",
-            "from": "0x55d8e87f0a40",
-            "to": "0x55d8e87f0ac0",
+            "from": "0x56073bc55b70",
+            "to": "0x56073bc55bf0",
             "type": "cfg"
         },
         {
             "color": "red",
-            "from": "0x55d8e87f0ac0",
-            "to": "0x55d8e87f0280",
+            "from": "0x56073bc55bf0",
+            "to": "0x56073bc54ba0",
             "type": "use"
         },
         {
             "color": "black",
-            "from": "0x55d8e87f0ac0",
-            "to": "0x55d8e87f0b40",
+            "from": "0x56073bc55bf0",
+            "to": "0x56073bc55c70",
             "type": "cfg"
         },
         {
             "color": "red",
-            "from": "0x55d8e87f0b40",
-            "to": "0x55d8e87f0410",
+            "from": "0x56073bc55c70",
+            "to": "0x56073bc55ad0",
             "type": "use"
         },
         {
             "color": "black",
-            "from": "0x55d8e87f0b40",
-            "to": "0x55d8e87dd5c0",
+            "from": "0x56073bc55c70",
+            "to": "0x56073baf91d0",
             "type": "cfg"
         },
         {
             "color": "red",
-            "from": "0x55d8e87dd5c0",
-            "to": "0x55d8e87f0ac0",
+            "from": "0x56073baf91d0",
+            "to": "0x56073bc55bf0",
             "type": "use"
         },
         {
             "color": "red",
-            "from": "0x55d8e87dd5c0",
-            "to": "0x55d8e87f0b40",
+            "from": "0x56073baf91d0",
+            "to": "0x56073bc55c70",
             "type": "use"
         },
         {
             "color": "black",
-            "from": "0x55d8e87dd5c0",
-            "to": "0x55d8e87f0bc0",
+            "from": "0x56073baf91d0",
+            "to": "0x56073bc07500",
             "type": "cfg"
         },
         {
             "color": "red",
-            "from": "0x55d8e87f0bc0",
-            "to": "0x55d8e87dd5c0",
+            "from": "0x56073bc07500",
+            "to": "0x56073baf91d0",
             "type": "use"
         }
     ],
@@ -125,40 +125,39 @@
         {
             "blocks": [
                 {
-                    "id": "0x55d8e87ecfe0",
+                    "id": "0x56073bc1ffb0",
                     "instructions": [
                         {
                             "has_addr": false,
                             "has_val": true,
-                            "id": "0x55d8e87ef220",
+                            "id": "0x56073bbdb3c0",
                             "text": "  %1 = alloca i32, align 4"
                         },
                         {
                             "has_addr": true,
                             "has_val": true,
-                            "id": "0x55d8e87efb40",
+                            "id": "0x56073bc20140",
                             "text": "  store i32 0, ptr %1, align 4"
                         },
                         {
                             "has_addr": false,
                             "has_val": true,
-                            "id": "0x55d8e87f0340",
+                            "id": "0x56073bc2b820",
                             "text": "  %2 = call i32 @add(i32 noundef 5, i32 noundef 3)"
                         },
                         {
                             "has_addr": false,
                             "has_val": true,
-                            "id": "0x55d8e87f0530",
+                            "id": "0x56073bc2b990",
                             "text": "  %3 = call i32 (ptr, ...) @printf(ptr noundef @.str, i32 noundef %2)"
                         },
                         {
                             "has_addr": false,
                             "has_val": false,
-                            "id": "0x55d8e87f0600",
+                            "id": "0x56073bc06ee0",
                             "text": "  ret i32 0"
                         }
-                    ],
-                    "label": "BB: 0x55d8e87ecfe0"
+                    ]
                 }
             ],
             "name": "main"
@@ -166,61 +165,143 @@
         {
             "blocks": [
                 {
-                    "id": "0x55d8e87f0470",
+                    "id": "0x56073bc53950",
                     "instructions": [
                         {
                             "has_addr": false,
                             "has_val": true,
-                            "id": "0x55d8e87f0280",
+                            "id": "0x56073bc54ba0",
                             "text": "  %3 = alloca i32, align 4"
                         },
                         {
                             "has_addr": false,
                             "has_val": true,
-                            "id": "0x55d8e87f0410",
+                            "id": "0x56073bc55ad0",
                             "text": "  %4 = alloca i32, align 4"
                         },
                         {
                             "has_addr": true,
                             "has_val": true,
-                            "id": "0x55d8e87f09a0",
+                            "id": "0x56073bc54c40",
                             "text": "  store i32 %0, ptr %3, align 4"
                         },
                         {
                             "has_addr": true,
                             "has_val": true,
-                            "id": "0x55d8e87f0a40",
+                            "id": "0x56073bc55b70",
                             "text": "  store i32 %1, ptr %4, align 4"
                         },
                         {
                             "has_addr": true,
                             "has_val": true,
-                            "id": "0x55d8e87f0ac0",
+                            "id": "0x56073bc55bf0",
                             "text": "  %5 = load i32, ptr %3, align 4"
                         },
                         {
                             "has_addr": true,
                             "has_val": true,
-                            "id": "0x55d8e87f0b40",
+                            "id": "0x56073bc55c70",
                             "text": "  %6 = load i32, ptr %4, align 4"
                         },
                         {
                             "has_addr": false,
                             "has_val": true,
-                            "id": "0x55d8e87dd5c0",
+                            "id": "0x56073baf91d0",
                             "text": "  %7 = add nsw i32 %5, %6"
                         },
                         {
                             "has_addr": false,
                             "has_val": false,
-                            "id": "0x55d8e87f0bc0",
+                            "id": "0x56073bc07500",
                             "text": "  ret i32 %7"
                         }
-                    ],
-                    "label": "BB: 0x55d8e87f0470"
+                    ]
                 }
             ],
             "name": "add"
+        }
+    ],
+    "values": [
+        {
+            "id": "0x56073bc12800",
+            "val": 140725213341812
+        },
+        {
+            "id": "0x56073bbdb3c0",
+            "val": 140725213341812
+        },
+        {
+            "addr": "0x7ffd245a2874",
+            "id": "0x56073bc20140",
+            "val": 0
+        },
+        {
+            "id": "0x56073bc3d9e0",
+            "val": 140725213341748
+        },
+        {
+            "id": "0x56073bc54ba0",
+            "val": 140725213341748
+        },
+        {
+            "id": "0x56073bc3dc30",
+            "val": 140725213341744
+        },
+        {
+            "id": "0x56073bc55ad0",
+            "val": 140725213341744
+        },
+        {
+            "addr": "0x7ffd245a2834",
+            "id": "0x56073bc54c40",
+            "val": 5
+        },
+        {
+            "addr": "0x7ffd245a2830",
+            "id": "0x56073bc55b70",
+            "val": 3
+        },
+        {
+            "id": "0x56073bc3e180",
+            "val": 5
+        },
+        {
+            "addr": "0x7ffd245a2834",
+            "id": "0x56073bc55bf0",
+            "val": 5
+        },
+        {
+            "id": "0x56073bc3e3f0",
+            "val": 3
+        },
+        {
+            "addr": "0x7ffd245a2830",
+            "id": "0x56073bc55c70",
+            "val": 3
+        },
+        {
+            "id": "0x56073bc3e660",
+            "val": 8
+        },
+        {
+            "id": "0x56073baf91d0",
+            "val": 8
+        },
+        {
+            "id": "0x56073bc3d600",
+            "val": 8
+        },
+        {
+            "id": "0x56073bc2b820",
+            "val": 8
+        },
+        {
+            "id": "0x56073bc3d7f0",
+            "val": 1
+        },
+        {
+            "id": "0x56073bc2b990",
+            "val": 1
         }
     ]
 }

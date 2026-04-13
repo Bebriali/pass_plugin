@@ -1,47 +1,61 @@
+#include <assert.h>
+
 #include "defuse_dump_json.hpp"
 
 namespace llvm {
-void JsonDumper::addFunction(std::string Name) {
+
+JsonDumper::JsonDumper(std::string filename) : filename(std::move(filename)) {
+    root["functions"] = nlohmann::json::array();
+    root["edges"] = nlohmann::json::array();
+    root["values"] = nlohmann::json::array();
+}
+
+JsonDumper::~JsonDumper() {
+    if (!filename.empty()) {
+        save();
+    }
+}
+
+void JsonDumper::addFunction(std::string name) {
     root["functions"].push_back({
-        {"name", std::move(Name)},
-        {"blocks", json::array()}
+        {"name", std::move(name)},
+        {"blocks", nlohmann::json::array()}
     });
-    currentFunc = &root["functions"].back();
+    current_func = &root["functions"].back();
 }
 
-void JsonDumper::addBasicBlock(std::string ID, std::string Label) {
-    if (!currentFunc) return;
+void JsonDumper::addBasicBlock(std::string id) {
+    assert(current_func);
 
-    (*currentFunc)["blocks"].push_back({
-        {"id", std::move(ID)},
-        {"label", std::move(Label)},
-        {"instructions", json::array()}
+    (*current_func)["blocks"].push_back({
+        {"id", std::move(id)},
+        {"instructions", nlohmann::json::array()}
     });
-    currentBB = &((*currentFunc)["blocks"].back());
+    current_block = &((*current_func)["blocks"].back());
 }
 
-void JsonDumper::addInstruction(std::string ID, std::string Text, bool hasVal, bool hasAddr) {
-    if (!currentBB) return;
+void JsonDumper::addInstruction(std::string id, std::string text, bool has_val, bool has_addr) {
+    assert(current_block);
 
-    (*currentBB)["instructions"].push_back({
-        {"id", std::move(ID)},
-        {"text", std::move(Text)},
-        {"has_val", hasVal},
-        {"has_addr", hasAddr}
+    (*current_block)["instructions"].push_back({
+        {"id", std::move(id)},
+        {"text", std::move(text)},
+        {"has_val", has_val},
+        {"has_addr", has_addr}
     });
 }
 
-void JsonDumper::addEdge(std::string FromID, std::string ToID, std::string Type, std::string Color) {
+void JsonDumper::addEdge(std::string fromID, std::string toID, std::string type, std::string color) {
     root["edges"].push_back({
-        {"from", std::move(FromID)},
-        {"to", std::move(ToID)},
-        {"type", std::move(Type)},
-        {"color", std::move(Color)}
+        {"from", std::move(fromID)},
+        {"to", std::move(toID)},
+        {"type", std::move(type)},
+        {"color", std::move(color)}
     });
 }
 
 void JsonDumper::save() {
-    std::ofstream out(Filename);
+    std::ofstream out(filename);
     if (out.is_open()) {
         out << root.dump(4) << std::endl;
     }

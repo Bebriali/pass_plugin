@@ -1,4 +1,6 @@
+#include <cstdlib>
 #include <iostream>
+#include <sstream>
 #include <unordered_map>
 
 #include "llvm/Passes/PassBuilder.h"
@@ -10,150 +12,159 @@
 using namespace llvm;
 
 namespace llvm {
-    PreservedAnalyses DefUsePluginPass::run(Module& M, ModuleAnalysisManager &AM) {
-        auto setup = prepareContext(M);
+    PreservedAnalyses DefUsePluginPass::run(Module& module, ModuleAnalysisManager &analysis_manager) {
+        auto rtd = setupRuntimeDumper(module);
         
-        dumpDefuse(M, setup.dumper);
+        dumpDefuse(module, rtd.dumper);
 
-        instrumentation(M, setup);
+        injectInstrumentation(module, rtd);
 
         return PreservedAnalyses::none();
     }
     
-    DefUsePluginPass::RuntimeInfo DefUsePluginPass::setupRuntime(Module& M, LLVMContext& ctx) {
-        Type *I64Ty = Type::getInt64Ty(ctx);
-        Type *PtrTy = PointerType::get(ctx, 0);
-        Type *VoidTy = Type::getVoidTy(ctx);
+    DefUsePluginPass::RuntimeDumper DefUsePluginPass::setupRuntimeDumper(Module& module) {
+        const char* dump_path = std::getenv("DEFUSE_IR_DUMP_PATH");
+        JsonDumper dumper(dump_path);
+
+        LLVMContext &ctx = module.getContext();
+
+        Type *int64Ty = Type::getInt64Ty(ctx);
+        Type *voidTy = Type::getVoidTy(ctx);
 
         return {
-            M.getOrInsertFunction("log_long_val", FunctionType::get(VoidTy, {I64Ty, I64Ty}, false)),
-            M.getOrInsertFunction("log_mem", FunctionType::get(VoidTy, {I64Ty, I64Ty, PtrTy}, false))
-        };
-    }
-
-    DefUsePluginPass::SetupContext DefUsePluginPass::prepareContext(Module& M) {
-        JsonDumper dumper("log/json/ir_dump.json");
-
-        LLVMContext &ctx = M.getContext();
-        RuntimeInfo rt = setupRuntime(M, ctx);
-
-        return {std::move(dumper), ctx, rt};
+            module.getOrInsertFunction("initLogger", FunctionType::get(voidTy, {int64Ty}, false)), 
+            module.getOrInsertFunction("logLongVal", FunctionType::get(voidTy, {int64Ty, int64Ty}, false)),
+            module.getOrInsertFunction("logMem", FunctionType::get(voidTy, {int64Ty, int64Ty, int64Ty}, false)),
+            dumper,
+            ctx
+        }; 
     }
     
-    void DefUsePluginPass::dumpDefuse(Module& M, JsonDumper& dumper) {
-        auto toHexStr = [](void* P) -> std::string {
+    void DefUsePluginPass::dumpDefuse(Module& module, JsonDumper& dumper) {
+        auto toHexStr = [](void* ptr) -> std::string {
             std::stringstream ss;
-            ss << "0x" << std::hex << reinterpret_cast<uintptr_t>(P);
+            ss << "0x" << std::hex << reinterpret_cast<uintptr_t>(ptr);
             return ss.str();
         };
     
-        auto instToString = [](Instruction& I) -> std::string {
+        auto instToString = [](Instruction& instruction) -> std::string {
             std::string s;
             raw_string_ostream os(s);
-            I.print(os);
+            instruction.print(os);
             return s;
         };
 
-        for (Function& F : M) {
-            if (F.isDeclaration()) continue;
+        for (Function& function : module) {
+            if (function.isDeclaration()) continue;
 
-            dumper.addFunction(F.getName().str());
+            dumper.addFunction(function.getName().str());
 
-            for (BasicBlock& BB : F) {
-                std::string bbId = toHexStr(&BB);
-                dumper.addBasicBlock(bbId, "BB: " + bbId);
+            for (BasicBlock& block : function) {
+                std::string bbId = toHexStr(&block);
+                dumper.addBasicBlock(bbId);
 
-                Instruction* PrevInst = nullptr;
+                Instruction* prev_inst = nullptr;
 
-                for (Instruction& I : BB) {
-                    std::string instId = toHexStr(&I);
+                for (Instruction& instruction : block) {
+                    std::string instId = toHexStr(&instruction);
 
-                    bool hasV = !I.getType()->isVoidTy() || isa<StoreInst>(I);
-                    bool hasA = isa<LoadInst>(I) || isa<StoreInst>(I);
+                    bool hasV = !instruction.getType()->isVoidTy() || isa<StoreInst>(instruction);
+                    bool hasA = isa<LoadInst>(instruction) || isa<StoreInst>(instruction);
 
-                    dumper.addInstruction(instId, instToString(I), hasV, hasA);
+                    dumper.addInstruction(instId, instToString(instruction), hasV, hasA);
                 
-                    if (PrevInst) {
+                    if (prev_inst) {
                         // edge from prev to current instruction
-                        dumper.addEdge(toHexStr(PrevInst), instId, "cfg", "black");
+                        dumper.addEdge(toHexStr(prev_inst), instId, "cfg", "black");
                     }
-                    PrevInst = &I;
+                    prev_inst = &instruction;
 
-                    for (Use& U : I.operands()){
-
-                        Value* v = U.get();
-                        if (Instruction* DefInst = dyn_cast<Instruction>(v)) {
-                            dumper.addEdge(instId, toHexStr(DefInst), "use", "red");
+                    for (Use& u : instruction.operands()){
+                        Value* val = u.get();
+                        if (Instruction* def_inst = dyn_cast<Instruction>(val)) {
+                            dumper.addEdge(instId, toHexStr(def_inst), "use", "red");
                         }
                     }
                 }
 
                 // connecting basic blocks
-                Instruction *Term = BB.getTerminator();
+                Instruction *term = block.getTerminator();
 
-                for (unsigned i = 0; i < Term->getNumSuccessors(); ++i) {
-                    BasicBlock *Successor = Term->getSuccessor(i);
-                    dumper.addEdge(toHexStr(Term), toHexStr(&Successor->front()), "cfg-link", "blue");
+                for (auto *successor: successors(term)) {
+                    dumper.addEdge(toHexStr(term), toHexStr(&successor->front()), "cfg-link", "blue");
                 }
             }
         }
         dumper.save();
     }
 
-    void DefUsePluginPass::instrumentation(Module& M, SetupContext& S) {
-        for (Function& F : M) {
-            if (F.isDeclaration()) continue;
-            for (BasicBlock& BB : F) {
-                for (Instruction& I : BB) {
+    Value* DefUsePluginPass::getCastedValue(IRBuilder<>& builder, Value* val, Type* destTy) {
+        if (!val || val->getType()->isVoidTy()) return nullptr;
 
-                    if (I.isTerminator()) continue;
-                    
-                    IRBuilder<> Builder(S.ctx);
-                    uint64_t ID = reinterpret_cast<uintptr_t>(&I);
-                    Type* I64Ty = Type::getInt64Ty(S.ctx);
-        
-                    if (auto* SI = dyn_cast<StoreInst>(&I)) {
-                        Builder.SetInsertPoint(&I);
-        
-                        Value* Val = SI->getValueOperand();
-                        Value* Addr = SI->getPointerOperand();
-                        
-                        Value* CastedVal = Val->getType()->isPointerTy() ? 
-                            Builder.CreatePtrToInt(Val, I64Ty) : 
-                            Builder.CreateIntCast(Val, I64Ty, false);
+        // avoiding unnecessary casts
+        Type* srcTy = val->getType();
+        if (srcTy == destTy) return val;
 
-                        Builder.CreateCall(S.rt.logmemfn, {Builder.getInt64(ID), CastedVal, Addr});
-                    }
-                    else if (auto* LI = dyn_cast<LoadInst>(&I)) {
-                        auto* Next = I.getNextNode();
-                        if (Next) Builder.SetInsertPoint(Next);
+        if (val->getType()->isIntegerTy()) {
+            return builder.CreateIntCast(val, destTy, false);
+        } 
+        if (val->getType()->isPointerTy()) {
+            return builder.CreatePtrToInt(val, destTy);
+        }
 
-                        Value* Addr = LI->getPointerOperand();
-                        Value* CastedVal = nullptr;
+        return nullptr;
+    }
 
-                        if (I.getType()->isPointerTy()) {
-                            CastedVal = Builder.CreatePtrToInt(&I, I64Ty);
-                        } else {
-                            CastedVal = Builder.CreateIntCast(&I, I64Ty, false);
+    void DefUsePluginPass::createInstrumentationCall(IRBuilder<>& builder, FunctionCallee func, 
+                               Instruction& instruction, Value* casted_val, Value* addr) {
+        if (!casted_val) return;
+
+        uint64_t id = reinterpret_cast<uintptr_t>(&instruction);
+        Value* idVal = builder.getInt64(id);
+
+        SmallVector<Value*, 3> args;
+        args.push_back(idVal);
+        args.push_back(casted_val);
+        if (addr) args.push_back(addr);
+
+        builder.CreateCall(func, args);
+    }
+
+    void DefUsePluginPass::injectInstrumentation(Module& module, RuntimeDumper& rtd) {
+        if (Function* main = module.getFunction("main")) {
+            if (!main->isDeclaration()) {
+                const char* env_path = std::getenv("DEFUSE_IR_DUMP_PATH");
+                const char* path = (env_path && *env_path) ? env_path : "log/json/ir_dump.json";
+                IRBuilder<> builder(&*main->getEntryBlock().getFirstInsertionPt());
+                builder.CreateCall(rtd.initloggerfn, {builder.CreateGlobalString(path)});
+            }
+        }
+
+        Type* int64Ty = Type::getInt64Ty(rtd.ctx);
+
+        for (Function& function : module) {
+            if (function.isDeclaration()) continue;
+            for (BasicBlock& block : function) {
+                for (Instruction& instruction : block) {
+                    if (instruction.isTerminator()) continue;
+
+                    if (auto* si = dyn_cast<StoreInst>(&instruction)) {
+                        IRBuilder<> builder(&instruction);
+                        Value* casted = getCastedValue(builder, si->getValueOperand(), int64Ty);
+                        createInstrumentationCall(builder, rtd.logmemfn, instruction, casted, si->getPointerOperand());
+                    } 
+                    else if (auto* li = dyn_cast<LoadInst>(&instruction)) {
+                        if (auto* next = instruction.getNextNode()) {
+                            IRBuilder<> builder(next);
+                            Value* casted = getCastedValue(builder, li, int64Ty);
+                            createInstrumentationCall(builder, rtd.logmemfn, instruction, casted, li->getPointerOperand());
                         }
-
-                        if (CastedVal) {
-                            Builder.CreateCall(S.rt.logmemfn, {Builder.getInt64(ID), CastedVal, Addr});
-                        }
-                    }
-                    else if (!I.getType()->isVoidTy()) {
-                        auto* Next = I.getNextNode();
-                        if (Next) Builder.SetInsertPoint(Next);
-
-                        Value* CastedVal = nullptr;
-                        if (I.getType()->isIntegerTy()) {
-                            CastedVal = Builder.CreateIntCast(&I, I64Ty, false);
-                        } else if (I.getType()->isPointerTy()) {
-                            CastedVal = Builder.CreatePtrToInt(&I, I64Ty);
-                        }
-
-                        if (CastedVal) {
-                            Builder.CreateCall(S.rt.loglongfn, {Builder.getInt64(ID), CastedVal});
+                    } 
+                    else {
+                        if (auto* next = instruction.getNextNode()) {
+                            IRBuilder<> builder(next);
+                            Value* casted = getCastedValue(builder, &instruction, int64Ty);
+                            createInstrumentationCall(builder, rtd.loglongfn, instruction, casted);
                         }
                     }
                 }
@@ -172,6 +183,11 @@ extern "C" LLVM_ATTRIBUTE_WEAK ::llvm::PassPluginLibraryInfo llvmGetPassPluginIn
         "DefUsePlugin",
         LLVM_VERSION_STRING,
         [](PassBuilder &PB) {
+            PB.registerPipelineStartEPCallback(
+                [](ModulePassManager &MPM, OptimizationLevel) {
+                    MPM.addPass(DefUsePluginPass());
+                });
+
             PB.registerPipelineParsingCallback(
                 [](StringRef Name, ModulePassManager &MPM,
                    ArrayRef<PassBuilder::PipelineElement>) {

@@ -1,19 +1,27 @@
-import json, graphviz, collections
+import json, graphviz, collections, argparse
 
-def load_exec(path):
+def load_values(path):
     data = collections.defaultdict(lambda: {'val': '?', 'addr': '?'})
     try:
         with open(path) as f:
-            for p in (line.split() for line in f if line.strip()):
-                idx = hex(int(p[0], 0))
-                data[idx]['val'] = p[1]
-                if len(p) == 3: data[idx]['addr'] = p[2]
-    except FileNotFoundError: print(f"Log {path} missing")
+            payload = json.load(f)
+            values = payload.get('values', payload)
+            for entry in values:
+                idx = entry.get('id')
+                if not idx:
+                    continue
+                data[idx]['val'] = entry.get('val', '?')
+                if 'addr' in entry:
+                    data[idx]['addr'] = entry.get('addr', '?')
+    except FileNotFoundError:
+        print(f"Values file {path} missing")
+    except json.JSONDecodeError as exc:
+        print(f"Failed to parse values JSON {path}: {exc}")
     return data
 
-def enrich_and_render(json_in, log_path, json_out, img_out):
+def enrich_and_render(json_in, img_out):
     with open(json_in) as f: ir = json.load(f)
-    exec_data = load_exec(log_path)
+    exec_data = load_values(json_in)
     
     dot = graphviz.Digraph(format='png', graph_attr={'compound':'true', 'rankdir':'TB'})
     dot.attr('node', shape='record', fontname='Courier')
@@ -39,14 +47,17 @@ def enrich_and_render(json_in, log_path, json_out, img_out):
         dot.edge(e['from'], e['to'], label=e.get('type',''), color=e.get('color','black'),
                  style='dashed' if e.get('color')=='red' else 'solid')
 
-    with open(json_out, "w") as f: json.dump(ir, f, indent=4)
-    dot.render(img_out, cleanup=True)
-    print(f"Success: JSON -> {json_out}, IMG -> {img_out}.png")
+    dot.render(img_out[:-4] if img_out.endswith('.png') else img_out, cleanup=True)
+    print(f"Success: IMG -> {img_out}")
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(prog='ProgramName')
+
+    parser.add_argument('ir_dump', help='Path to IR dump JSON')
+    parser.add_argument('output_png', help='Path to output PNG')
+
+    args = parser.parse_args()
     enrich_and_render(
-        "log/json/ir_dump.json", 
-        "log/values.log", 
-        "log/json/ir_combined.json", 
-        "log/pic/final"
+        args.ir_dump,
+        args.output_png
     )
