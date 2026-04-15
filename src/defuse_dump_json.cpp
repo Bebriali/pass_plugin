@@ -8,6 +8,7 @@ JsonDumper::JsonDumper(std::string filename) : filename(std::move(filename)) {
     root["functions"] = nlohmann::json::array();
     root["edges"] = nlohmann::json::array();
     root["values"] = nlohmann::json::array();
+    root["call_edges"] = nlohmann::json::array();
 }
 
 JsonDumper::~JsonDumper() {
@@ -51,6 +52,18 @@ void JsonDumper::addEdge(std::string fromID, std::string toID, std::string type,
         {"to", std::move(toID)},
         {"type", std::move(type)},
         {"color", std::move(color)}
+    });
+}
+
+void JsonDumper::addCallEdge(std::string caller, std::string callee, uint64_t id) {
+    std::stringstream ss;
+    ss << "0x" << std::hex << id;
+    std::string idStr = ss.str();
+
+    root["call_edges"].push_back({
+        {"caller", std::move(caller)},
+        {"callee", std::move(callee)},
+        {"id", idStr}
     });
 }
 

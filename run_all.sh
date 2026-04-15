@@ -20,6 +20,7 @@ NAME="${FILENAME%.*}"
 
 echo -e "${GREEN}>>> configuring log paths ${NC}"
 export DEFUSE_IR_DUMP_PATH="${DEFUSE_IR_DUMP_PATH:-log/json/ir_dump.json}"
+export PIC_DUMP_PATH="${PIC_DUMP_PATH:-log/pic/}"
 
 echo -e "${GREEN}>>> Cleaning old artifacts...${NC}"
 rm -f run log/values.log log/json/*.json log/pic/*.png prog/*.ll
@@ -45,7 +46,7 @@ echo -e "${GREEN}>>> Executing program with args: ${RUN_ARGS}${NC}"
 ./run ${RUN_ARGS}
 
 echo -e "${GREEN}>>> Generating graphs...${NC}"
-python3 runtime/overlay_json.py "$DEFUSE_IR_DUMP_PATH" log/pic/final.png
+python3 runtime/overlay_json.py "$DEFUSE_IR_DUMP_PATH" "$PIC_DUMP_PATH"defuse.png "$DEFUSE_IR_DUMP_PATH" "$PIC_DUMP_PATH"call.png
 
 if [ -f log/pic/final.png ]; then
     echo -e "${GREEN}>>> DONE! Result: log/pic/final.png${NC}"

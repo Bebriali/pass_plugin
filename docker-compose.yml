@@ -1,0 +1,9 @@
+services:
+  defuse-tool:
+    build: .
+    volumes:
+      - .:/app
+    environment:
+      - DEFUSE_IR_DUMP_PATH=log/json/ir_dump.json
+    stdin_open: true
+    tty: true

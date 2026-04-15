@@ -28,7 +28,8 @@ namespace llvm {
         void addInstruction(std::string id, std::string text, bool has_val, bool has_addr);
 
         void addEdge(std::string fromID, std::string toID, std::string type, std::string color);
-
+        void addCallEdge(std::string caller, std::string callee, uint64_t id);
+        
         void save();
     };
 }

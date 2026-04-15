@@ -22,9 +22,20 @@ namespace llvm {
     private:
         RuntimeDumper setupRuntimeDumper(Module& module);
         void dumpDefuse(Module& module, JsonDumper& dumper);
+        void dumpCallGraph(Module& module, JsonDumper& dumper);
+
+        void injectLoggerInit(Module& M, RuntimeDumper& rtd);
+        void injectLoggerDefUse(Module& module, RuntimeDumper& rtd);
+
         void createInstrumentationCall(IRBuilder<>& builder, FunctionCallee func, 
-                               Instruction& instruction, Value* casted_val, Value* addr = nullptr);
+            Instruction& instruction, Value* casted_val, Value* addr = nullptr);
+        void chooseCall(Instruction& instruction, RuntimeDumper& rtd);
+        void emitLog(IRBuilder<>& builder, FunctionCallee func, 
+                                   uint64_t id, Value* val, Value* addr);
         void injectInstrumentation(Module& module, RuntimeDumper& rtd);
+        void injectFunctionArgs(Function& function, RuntimeDumper& rtd);
+
+
         Value* getCastedValue(IRBuilder<>& builder, Value* val, Type* destTy);
     };
 } // namespace llvm

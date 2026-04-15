@@ -39,28 +39,18 @@ then use the following format pasting values:
 ```
 ---
 
-## how to run using bash script
-firstly, build and activate venv area:
+## how to run using docker
+firstly, build and activate docker container:
 ```
-python -m venv venv
+docker compose build
 ```
-...for building and
-```
-source venv/bin/activate
-```
-...or
-```
-venv/scripts/activate
-```
-for activating it.
-```
-chmod +x run_all.sh
-```
+
 then just run
 ```
-./run_all.sh <test_file> <args_for_test>
+docker compose run --rm defuse-tool ./run_all.sh <test_file> <args_for_test>
 ```
-using args from description of testing
+using args from description of testing (<args_for_test> work only for test2.c)
 ## graph example
 the result of running pass-plugin on test files is the following picture:
-![Def-Use Graph Example](log/pic/final.png)
+![Def-Use Graph Example](log/pic/defuse.png)
+![Call Graph Example](log/pic/call.png)
