@@ -1,23 +1,26 @@
 cmake_minimum_required(VERSION 3.10)
 project(DefUsePlugin)
 
+find_package(LLVM REQUIRED CONFIG COMPONENTS Core Support Passes)
+
+list(APPEND CMAKE_MODULE_PATH ${LLVM_CMAKE_DIR})
+include(AddLLVM)
+
 set(SRC_DIR ${CMAKE_CURRENT_SOURCE_DIR}/src)
 set(INC_DIR ${CMAKE_CURRENT_SOURCE_DIR}/include)
 
-# finding installed llvm
-find_package(LLVM REQUIRED CONFIG)
-
-# adding paths to includes
-include_directories(${LLVM_INCLUDE_DIRS} ${INC_DIR})
-add_definitions(${LLVM_DEFINITIONS})
-
-# creating library (our plugin)
-add_library(DefUsePlugin MODULE
+set(PLUGIN_SOURCES
     ${SRC_DIR}/defuse_plugin.cpp
+    ${SRC_DIR}/defuse_dump_json.cpp
 )
 
-# throwing out prefix 'lib'
-set_target_properties(DefUsePlugin PROPERTIES PREFIX "")
+add_llvm_pass_plugin(DefUsePlugin ${PLUGIN_SOURCES})
 
-llvm_map_components_to_libnames(llvm_libs core support irreader)
-target_link_libraries(DefUsePlugin LLVM)
+target_include_directories(DefUsePlugin PRIVATE 
+    ${INC_DIR}
+    ${LLVM_INCLUDE_DIRS}
+)
+
+target_link_libraries(DefUsePlugin PRIVATE LLVM)
+
+set_target_properties(DefUsePlugin PROPERTIES PREFIX "")

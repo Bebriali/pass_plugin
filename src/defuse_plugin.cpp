@@ -1,216 +1,271 @@
+#include <cstdlib>
 #include <iostream>
-#include <map>
+#include <sstream>
+#include <unordered_map>
 
 #include "llvm/Passes/PassBuilder.h"
-#include "llvm/Plugins/PassPlugin.h"
-#include "llvm/IR/Module.h"
+#include "llvm/Passes/PassPlugin.h"
 #include "llvm/IR/IRBuilder.h"
 #include "defuse_plugin.hpp"
+#include "defuse_dump_json.hpp"
 
 using namespace llvm;
 
 namespace llvm {
+    PreservedAnalyses DefUsePluginPass::run(Module& module, ModuleAnalysisManager &analysis_manager) {
+        auto rtd = setupRuntimeDumper(module);
+        
+        dumpDefuse(module, rtd.dumper);
+        dumpCallGraph(module, rtd.dumper);
 
-    PreservedAnalyses DefUsePluginPass::run(Module& M, ModuleAnalysisManager &AM) {
-        std::error_code EC;
-        raw_fd_ostream DotFile("log/dot/graph.dot", EC, sys::fs::OF_Text);
-        if (EC)
-            return PreservedAnalyses::all();
+        injectInstrumentation(module, rtd);
+
+        return PreservedAnalyses::none();
+    }
     
-        // FIXME[flops]: Move ALL Dot dump functional into separate funcs/class or
-        // You can dump info about def use graph in machine-readable format like JSON/CSV
-        // And generate graph in overlay.py via pygraphviz/networkx e.t.c.
+    DefUsePluginPass::RuntimeDumper DefUsePluginPass::setupRuntimeDumper(Module& module) {
+        const char* dump_path = std::getenv("DEFUSE_IR_DUMP_PATH");
+        JsonDumper dumper(dump_path);
 
-        DotFile << "digraph \"def-use\" {\n"; // the declaration of graph in *.dot
-        DotFile << "  compound=true;\n";
-        DotFile << "  node [shape=box, fontname=\"Courier\"];\n";
+        LLVMContext &ctx = module.getContext();
+
+        Type *int64Ty = Type::getInt64Ty(ctx);
+        Type *voidTy = Type::getVoidTy(ctx);
+        Type *Int8PtrTy = Type::getInt8PtrTy(ctx);
+
+        return {
+            module.getOrInsertFunction("initLogger", FunctionType::get(voidTy, {Int8PtrTy}, false)), 
+            module.getOrInsertFunction("logLongVal", FunctionType::get(voidTy, {int64Ty, int64Ty}, false)),
+            module.getOrInsertFunction("logMem", FunctionType::get(voidTy, {int64Ty, int64Ty, int64Ty}, false)),
+            dumper,
+            ctx
+        }; 
+    }
     
-        LLVMContext &ctx = M.getContext();
-        FunctionCallee loglongfn = M.getOrInsertFunction("__log_long_val", 
-            FunctionType::get(Type::getVoidTy(ctx), 
-            {Type::getInt32Ty(ctx), Type::getInt64Ty(ctx)}, 
-            false));
-
-        FunctionCallee logfn = M.getOrInsertFunction("__log_val", 
-            FunctionType::get(Type::getVoidTy(ctx), 
-            {Type::getInt32Ty(ctx), Type::getInt32Ty(ctx)}, 
-            false));
-
-        FunctionCallee logaddrfn = M.getOrInsertFunction("__log_addr", 
-            FunctionType::get(Type::getVoidTy(ctx), 
-            {Type::getInt32Ty(ctx), PointerType::get(ctx, 0)},
-            false));
-
-        // FIXME[flops]: Move it to the separate function
-        // P.S.[flops]: Better completely remove it, you can use just instruction address as instruction ID
-        int InstID = 0;
-        std::map<Instruction*, int> InstToID;
-        for (Function& F : M) {
-            for (BasicBlock& BB : F) {
-                for (Instruction& I : BB) {
-                    InstToID[&I] = InstID++;
-                }
-            }
-        }
+    void DefUsePluginPass::dumpDefuse(Module& module, JsonDumper& dumper) {
+        auto toHexStr = [](void* ptr) -> std::string {
+            std::stringstream ss;
+            ss << "0x" << std::hex << reinterpret_cast<uintptr_t>(ptr);
+            return ss.str();
+        };
     
-        // FIXME[flops]: inconsistent naming: use only one specific case
-        // TODO[flops]: You may use just `for (Function& f : M)`
-        for (Function& f : M.functions()) {
-            if (f.isDeclaration()) continue;
-    
-            DotFile << "  subgraph \"cluster_" << f.getName().str() << "\" {\n";
+        auto instToString = [](Instruction& instruction) -> std::string {
+            std::string s;
+            raw_string_ostream os(s);
+            instruction.print(os);
+            return s;
+        };
 
-            DotFile << "    label = \"Function: " << f.getName().str() << "\";\n";
-            DotFile << "    fontsize = 30;\n";
-            DotFile << "    fontname = \"Arial Bold\";\n";
+        for (Function& function : module) {
+            if (function.isDeclaration()) continue;
 
-            DotFile << "    style = filled;\n";
-            DotFile << "    color = black;\n";
-            DotFile << "    fillcolor = white;\n";
-            DotFile << "    penwidth = 3.0;\n";
+            dumper.addFunction(function.getName().str());
 
-            for (BasicBlock& BB : f) {
-                DotFile << "  subgraph \"cluster_" << &BB << "\" {\n";
-                DotFile << "    label = \"Basic Block: " << &BB << "\";\n";
-                DotFile << "    style = filled;\n";
-                DotFile << "    color = black;\n";
-                DotFile << "    penwidth = 2.0;\n";
-                DotFile << "    fillcolor = pink;\n";
-    
-                Instruction* PrevInst = nullptr;
+            for (BasicBlock& block : function) {
+                std::string bbId = toHexStr(&block);
+                dumper.addBasicBlock(bbId);
 
-                // FIXME[flops]: Insts vector is useless, you can just iterate trough BB there --\ 
-                std::vector<Instruction*> Insts; //                                               |
-                for (Instruction& I : BB) { //                                                    |
-                    Insts.push_back(&I); //                                                       |
-                } //                                                                              |
-                //                                                                                |
-                for (Instruction* I : Insts) { // <----------------------------------------------/
-                    int currentID = InstToID[I];
-                    
-                    DotFile << "// Instruction: " << *I << "\n";
-                    DotFile << "    \"inst_" << currentID << "\" [label=\"{ " << *I;
-                    if (!I->getType()->isVoidTy() || isa<StoreInst>(I)) {
-                        DotFile << " | VALUE: <val_" << currentID << "> ? ";
-                    }
-                    if (isa<LoadInst>(I) || isa<StoreInst>(I)) {
-                        DotFile << " | ADDR: <addr_" << currentID << "> ? ";
-                    }
-                    DotFile << " }\"];\n";
-                    
-                    if (PrevInst) {
+                Instruction* prev_inst = nullptr;
+
+                for (Instruction& instruction : block) {
+                    std::string instId = toHexStr(&instruction);
+
+                    bool hasV = !instruction.getType()->isVoidTy() || isa<StoreInst>(instruction);
+                    bool hasA = isa<LoadInst>(instruction) || isa<StoreInst>(instruction);
+
+                    dumper.addInstruction(instId, instToString(instruction), hasV, hasA);
+                
+                    if (prev_inst) {
                         // edge from prev to current instruction
-                        DotFile << "    \"inst_" << InstToID[PrevInst] << "\" -> \"inst_" << currentID << "\" [style=bold];\n";
+                        dumper.addEdge(toHexStr(prev_inst), instId, "cfg", "black");
                     }
-                    PrevInst = I;
-    
-                    for (Use& U : I->operands()){
-    
-                        Value* v = U.get(); 
-                        if (Instruction* DefInst = dyn_cast<Instruction>(U)) {
-                            DotFile << "    \"inst_" << currentID << "\" -> \"inst_" << InstToID[DefInst] 
-                                        << "\" [style=dashed, color=red, constraint=false];\n";
+                    prev_inst = &instruction;
+
+                    for (Use& u : instruction.operands()){
+                        Value* val = u.get();
+                        if (Instruction* def_inst = dyn_cast<Instruction>(val)) {
+                            dumper.addEdge(instId, toHexStr(def_inst), "use", "red");
                         }
                     }
                 }
-                DotFile << "  } // basic block " << &BB << "subgraph" << "\n";
-                
+
                 // connecting basic blocks
-                Instruction *Term = BB.getTerminator();
-                int TermID = InstToID[Term];
-                
-                for (unsigned i = 0; i < Term->getNumSuccessors(); ++i) {
-                    BasicBlock *Successor = Term->getSuccessor(i);
-                    Instruction *FirstInst = &Successor->front();
-                    
-                    int TermID = InstToID[Term];
-                    int DestID = InstToID[FirstInst];
-                    DotFile << "  \"inst_" << TermID << "\" -> \"inst_" << DestID 
-                            << "\" [penwidth=2, color=blue, weight=0];\n";
-                }
-            }
+                Instruction *term = block.getTerminator();
 
-            DotFile << "  } // functional subgraph" << f.getName() << "\n";
-        }
-    
-        DotFile << "} // def-use\n"; // closing graph def-use
-
-        // FIXME[flops]: InstrumentationList is completely useless there
-        std::vector<Instruction*> InstrumentationList;
-        for (auto const& [Inst, ID] : InstToID) {
-            InstrumentationList.push_back(Inst);
-        }
-    
-        // FIXME[flops]: `for (auto const& [Inst, ID]: InstToID)`
-        for (Instruction* Inst : InstrumentationList) {
-            if (Inst->isTerminator()) continue;
-
-            int ID = InstToID[Inst]; // FIXME[flops]: You already have instr ID
-
-            IRBuilder<> Builder(ctx);
-
-            if (isa<StoreInst>(Inst)) { // [flops]: Better add comment why StoreInst has different handle
-                Builder.SetInsertPoint(Inst);
-            } 
-            else {
-                auto* Next = Inst->getNextNode();
-                if (Next) Builder.SetInsertPoint(Next);
-                else Builder.SetInsertPoint(Inst->getParent());
-            }
-
-            Value* Valtolog = nullptr;
-            Value* Addrtolog = nullptr;
-
-            // specific for load/store
-            if (auto* LI = dyn_cast<LoadInst>(Inst)) {
-                Valtolog = Inst;
-                Addrtolog = LI->getPointerOperand();
-            } 
-            else if (auto* SI = dyn_cast<StoreInst>(Inst)) {
-                Valtolog = SI->getValueOperand();
-                Addrtolog = SI->getPointerOperand();
-                Builder.SetInsertPoint(Inst);
-            } 
-            else if (!Inst->getType()->isVoidTy()) {
-                Valtolog = Inst;
-            }
-
-            if (Addrtolog) {
-                Builder.CreateCall(logaddrfn, {Builder.getInt32(ID + 10000), Addrtolog}); // BUG //FIXME[flops]: Magic constant, why 10000?
-            }
-
-            if (Valtolog) {
-                Type* ValTy = Valtolog->getType();
-                
-                if (ValTy->isIntegerTy() && ValTy->getIntegerBitWidth() <= 32) { //FIXME[flops]: Magic hardcoded constant. You can make it more flexible via cast using Builder
-                    Value* ExtVal = Builder.CreateZExt(Valtolog, Type::getInt32Ty(ctx));
-                    Builder.CreateCall(logfn, {Builder.getInt32(ID), ExtVal});
-                }
-                else if (ValTy->isIntegerTy(64) || ValTy->isPointerTy()) {
-                    Value* CastedVal = Valtolog;
-                    if (ValTy->isPointerTy()) {
-                        CastedVal = Builder.CreatePtrToInt(Valtolog, Type::getInt64Ty(ctx));
-                    }
-
-                    Builder.CreateCall(loglongfn, {Builder.getInt32(ID), CastedVal});
+                for (auto *successor: successors(term)) {
+                    dumper.addEdge(toHexStr(term), toHexStr(&successor->front()), "cfg-link", "blue");
                 }
             }
         }
-
-        return PreservedAnalyses::all();
+        dumper.save();
     }
+
+    Value* DefUsePluginPass::getCastedValue(IRBuilder<>& builder, Value* val, Type* destTy) {
+        if (!val || val->getType()->isVoidTy()) return nullptr;
+
+        // avoiding unnecessary casts
+        Type* srcTy = val->getType();
+        if (srcTy == destTy) return val;
+
+        if (val->getType()->isIntegerTy()) {
+            return builder.CreateIntCast(val, destTy, false);
+        } 
+        if (val->getType()->isPointerTy()) {
+            return builder.CreatePtrToInt(val, destTy);
+        }
+
+        return nullptr;
+    }
+
+    void DefUsePluginPass::createInstrumentationCall(IRBuilder<>& builder, FunctionCallee func, 
+                               Instruction& instruction, Value* casted_val, Value* addr) {
+        if (!casted_val) return;
+
+        uint64_t id = reinterpret_cast<uintptr_t>(&instruction);
+        Value* idVal = builder.getInt64(id);
+
+        SmallVector<Value*, 3> args;
+        args.push_back(idVal);
+        args.push_back(casted_val);
+        if (addr) args.push_back(addr);
+
+        builder.CreateCall(func, args);
+    }
+
+    void DefUsePluginPass::injectLoggerInit(Module& module, RuntimeDumper& rtd) {
+        if (Function* main = module.getFunction("main")) {
+            if (!main->isDeclaration()) {
+                const char* env_path = std::getenv("DEFUSE_IR_DUMP_PATH");
+                const char* path = (env_path && *env_path) ? env_path : "log/json/ir_dump.json";
+                Type* Int8PtrTy = Type::getInt8PtrTy(rtd.ctx);
+                IRBuilder<> builder(&*main->getEntryBlock().getFirstInsertionPt());
+                Value* path_char = builder.CreateGlobalStringPtr(path);
+                builder.CreateCall(rtd.initloggerfn, {path_char});
+            }
+        }
+    }
+
+    void DefUsePluginPass::chooseCall(Instruction& I, RuntimeDumper& rtd) {
+        Type* int64Ty = Type::getInt64Ty(rtd.ctx);
+        auto* next = I.getNextNode();
+        uint64_t instId = reinterpret_cast<uintptr_t>(&I);
+
+        if (auto* ci = dyn_cast<CallInst>(&I)) {
+            IRBuilder<> builder(ci);
+            for (unsigned i = 0; i < ci->arg_size(); ++i) {
+                Value* arg = ci->getArgOperand(i);
+                if (Value* castedArg = getCastedValue(builder, arg, int64Ty)) {
+                    emitLog(builder, rtd.loglongfn, instId + i + 1, castedArg, nullptr);
+                }
+            }
+
+            if (!ci->getType()->isVoidTy() && next) {
+                IRBuilder<> nextBuilder(next);
+                if (Value* castedRet = getCastedValue(nextBuilder, ci, int64Ty)) {
+                    emitLog(nextBuilder, rtd.loglongfn, instId, castedRet, nullptr);
+                }
+            }
+        }
+        else if (auto* si = dyn_cast<StoreInst>(&I)) {
+            IRBuilder<> builder(&I);
+            Value* casted = getCastedValue(builder, si->getValueOperand(), int64Ty);
+            Value* ptrAsInt = builder.CreatePtrToInt(si->getPointerOperand(), int64Ty);
+            emitLog(builder, rtd.logmemfn, instId, casted, ptrAsInt);
+        }
+        else if (next) {
+            IRBuilder<> builder(next);
+            Value* casted = getCastedValue(builder, &I, int64Ty);
+            if (auto* li = dyn_cast<LoadInst>(&I)) {
+                Value* ptrAsInt = builder.CreatePtrToInt(li->getPointerOperand(), int64Ty);
+                emitLog(builder, rtd.logmemfn, instId, casted, ptrAsInt);
+            } else {
+                emitLog(builder, rtd.loglongfn, instId, casted, nullptr);
+            }
+        }
+    }
+
+    void DefUsePluginPass::injectLoggerDefUse(Module& module, RuntimeDumper& rtd) {
+        for (Function& function : module) {
+            if (function.isDeclaration()) continue;
+            injectFunctionArgs(function, rtd);
+
+            for (BasicBlock& block : function) {
+                for (Instruction& instruction : block) {
+
+                    if (instruction.isTerminator()) continue;
+                    
+                    chooseCall(instruction, rtd);
+                }
+            }
+        }
+    }
+    
+    void DefUsePluginPass::injectInstrumentation(Module& module, RuntimeDumper& rtd) {
+        injectLoggerInit(module, rtd);
+
+        injectLoggerDefUse(module, rtd);
+    }
+
+    void DefUsePluginPass::emitLog(IRBuilder<>& builder, FunctionCallee func, 
+                                   uint64_t id, Value* val, Value* addr) {
+        if (!val) return;
+        Value* idVal = builder.getInt64(id);
+        SmallVector<Value*, 3> args = {idVal, val};
+        if (addr) args.push_back(addr);
+        builder.CreateCall(func, args);
+    }
+
+    void DefUsePluginPass::injectFunctionArgs(Function& function, RuntimeDumper& rtd) {
+        if (function.isDeclaration() || function.getName().startswith("log") || function.getName() == "main") return;
+
+        IRBuilder<> builder(&*function.getEntryBlock().getFirstInsertionPt());
+        Type* int64Ty = Type::getInt64Ty(rtd.ctx);
+
+        uint32_t argIdx = 0;
+        for (Argument &arg : function.args()) {
+            uint64_t argId = reinterpret_cast<uintptr_t>(&arg);
+            
+            Value* casted = getCastedValue(builder, &arg, int64Ty);
+            if (casted) {
+                emitLog(builder, rtd.loglongfn, argId, casted, nullptr);
+            }
+            argIdx++;
+        }
+    }
+
+    void DefUsePluginPass::dumpCallGraph(Module& module, JsonDumper& dumper) {
+        for (Function& function : module) {
+            if (function.isDeclaration()) continue;
+
+            for (BasicBlock& block : function) {
+                for (Instruction& instruction : block) {
+                    if (auto* ci = dyn_cast<CallInst>(&instruction)) {
+                        Function* Callee = ci->getCalledFunction();
+                        if (!Callee) continue;
+
+                        std::string callerName = function.getName().str();
+                        std::string calleeName = Callee->getName().str();
+                        
+                        dumper.addCallEdge(callerName, calleeName, reinterpret_cast<uintptr_t>(ci));
+                    }
+                }
+            }
+        }
+    }
+
 } // namespace llvm
 
-/**
- * plugin registration
- * to not build all llvm on my desk
- */
 extern "C" LLVM_ATTRIBUTE_WEAK ::llvm::PassPluginLibraryInfo llvmGetPassPluginInfo() {
     return {
-        LLVM_PLUGIN_API_VERSION, 
-        "DefUsePlugin", 
+        LLVM_PLUGIN_API_VERSION,
+        "DefUsePlugin",
         LLVM_VERSION_STRING,
         [](PassBuilder &PB) {
+            PB.registerPipelineStartEPCallback(
+                [](ModulePassManager &MPM, OptimizationLevel) {
+                    MPM.addPass(DefUsePluginPass());
+                });
+
             PB.registerPipelineParsingCallback(
                 [](StringRef Name, ModulePassManager &MPM,
                    ArrayRef<PassBuilder::PipelineElement>) {

@@ -3,16 +3,16 @@
 This project implements an LLVM Pass Plugin that visualizes the **Def-Use** chain and Control Flow Graph (CFG) of a program, augmented with real-time values captured during execution.
 - it gets instructions, dumps them to the *.dot file and generates picture of it in logs/pics/.
 - graph contains:
-    - instructions  
+    - instructions
     - either addr's for store and load, val's and pointers as a result of implementation of each instruction
-- simultaneosly, it injects a logger functions' (defined in scripts/logger.cpp) calls after each instruction to capture values during the program execution.
-- after getting values for each instruction dumped in log/values.log python script (scripts/overlay.py) 
+- simultaneosly, it injects a logger functions' (defined in runtime/logger.cpp) calls after each instruction to capture values during the program execution.
+- after getting values for each instruction dumped in log/values.log python script (runtime/overlay.py)
 - connects them to each node on graph, creating a final visualized execution trace in in logs/pic/final.dot.
 
---- 
+---
 
 ## Requirements
-* **LLVM 14+** (including `opt` and `clang`)
+* **LLVM 14+** (including `clang`)
 * **Graphviz** (`dot` utility)
 * **Python 3.x**
 * **CMake 3.10+**
@@ -39,69 +39,18 @@ then use the following format pasting values:
 ```
 ---
 
-## how to run
-### generating IR test file from our main 
-
+## how to run using docker
+firstly, build and activate docker container:
 ```
-clang -S -emit-llvm tests/test<i>.c -o prog/test.ll
-```
-... where i is a test number.
-
-### compiling our project
-
-```
-cmake -DCMAKE_BUILD_TYPE=debug -S . -B build && cmake --build build
+docker compose build
 ```
 
-running it on opt and saving to instrumented.ll file for disabling affect on test.ll file
-
+then just run
 ```
-opt -load-pass-plugin=./build/DefUsePlugin.so -passes="def-use-plugin" prog/test.ll -o prog/instrumented.ll
+docker compose run --rm defuse-tool ./run_all.sh <test_file> <args_for_test>
 ```
-... where i is a test number.
-you should see *.dot file appered in the working directory.
-
-### compiling test program with our runtime logger
-```
-clang prog/instrumented.ll scripts/logger.cpp -o run
-```
-after running with
-```
-./run
-```
-you should see runtime.log appeared in the working directory
-
-### overlaying values
-using script on python
-```
-python3 scripts/overlay.py 
-```
-### viewing diffs in graph
-```
-dot -Tpng log/dot/graph.dot -o log/pic/graph.png
-```
-or
-```
-dot -Tpng log/dot/final.dot -o log/pic/final.png
-```
-### full console input
-```
-cmake -DCMAKE_BUILD_TYPE=debug -S . -B build && cmake --build build && \
-opt -load-pass-plugin=./build/DefUsePlugin.so -passes="def-use-plugin" prog/test.ll -o prog/instrumented.ll && \
-clang++ prog/instrumented.ll scripts/logger.cpp -o run && \
-./run && \
-python3 scripts/overlay.py && \
-dot -Tpng log/dot/final.dot -o log/pic/final.png
-```
-## running using bash script
-```
-chmod +x run_all.sh
-```
-then just run it
-```
-./run_all.sh <test_file> <args_for_test>
-```
-using args from description of testing
+using args from description of testing (<args_for_test> work only for test2.c)
 ## graph example
 the result of running pass-plugin on test files is the following picture:
-![Def-Use Graph Example](log/pic/final.png)
+![Def-Use Graph Example](log/pic/defuse.png)
+![Call Graph Example](log/pic/call.png)
