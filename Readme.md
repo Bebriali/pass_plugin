@@ -1,5 +1,5 @@
 
-# DEF-USE GRAPH PASS-PLAGIN
+# DEF-USE GRAPH PASS-PLUGIN
 This project implements an LLVM Pass Plugin that visualizes the **Def-Use** chain and Control Flow Graph (CFG) of a program, augmented with real-time values captured during execution.
 - it gets instructions, dumps them to the *.dot file and generates picture of it in logs/pics/.
 - graph contains:
